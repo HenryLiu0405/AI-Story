@@ -1,0 +1,122 @@
+// Memory types
+export type MemoryType = 'character' | 'world' | 'plot' | 'custom';
+export type MessageRole = 'user' | 'assistant' | 'system';
+
+// Project
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+}
+
+// Session
+export interface Session {
+  id: string;
+  project_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSessionRequest {
+  project_id: string;
+  name?: string;
+}
+
+export interface UpdateSessionRequest {
+  name?: string;
+}
+
+// Message
+export interface Message {
+  id: string;
+  session_id: string;
+  role: MessageRole;
+  content: string;
+  created_at: string;
+}
+
+// Memory
+export interface Memory {
+  id: string;
+  project_id: string;
+  type: MemoryType;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateMemoryRequest {
+  project_id: string;
+  type: MemoryType;
+  title: string;
+  content: string;
+}
+
+export interface UpdateMemoryRequest {
+  type?: MemoryType;
+  title?: string;
+  content?: string;
+}
+
+// Knowledge Base
+export interface KnowledgeBase {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  created_at: string;
+}
+
+export interface CreateKnowledgeBaseRequest {
+  project_id: string;
+  name: string;
+  description?: string;
+}
+
+export interface Document {
+  id: string;
+  knowledge_base_id: string;
+  filename: string;
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
+// Chat
+export interface ChatRequest {
+  session_id: string;
+  project_id: string;
+  message: string;
+}
+
+export interface ChatResponse {
+  message: Message;
+  context_used: string[];
+}
+
+// Search
+export interface SearchRequest {
+  query: string;
+  knowledge_base_id?: string;
+  project_id?: string;
+  top_k?: number;
+}
+
+export interface SearchResult {
+  content: string;
+  metadata: Record<string, any>;
+  score: number;
+}
