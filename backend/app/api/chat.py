@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.models.models import Message, Session as SessionModel, Project, Memory, Document, KnowledgeBase
+from app.models.models import Message, Session as SessionModel, Project, Memory, KnowledgeBase, StoryBibleEntry
 from app.schemas.schemas import ChatRequest, ChatResponse, MessageResponse, SearchRequest, SearchResult
 from app.services.ai_service import ai_service
 from app.services.rag_service import rag_service
@@ -39,6 +39,15 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         for m in memories
     ]
     
+    # Get story bible entries
+    story_bible_entries = db.query(StoryBibleEntry).filter(
+        StoryBibleEntry.project_id == request.project_id
+    ).all()
+    story_bible_list = [
+        {"category": entry.category.value, "title": entry.title, "content": entry.content}
+        for entry in story_bible_entries
+    ]
+
     # Search knowledge base for relevant context
     knowledge_context = None
     context_used = []
@@ -48,11 +57,22 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     ).all()
     
     if knowledge_bases:
-        search_results = rag_service.search(
-            query=request.message,
-            project_id=request.project_id,
-            top_k=3
-        )
+        search_results = []
+        per_kb_results = max(1, 3 // len(knowledge_bases))
+        for kb in knowledge_bases:
+            kb_results = rag_service.search(
+                query=request.message,
+                knowledge_base_id=kb.id,
+                n_results=per_kb_results
+            )
+            for result in kb_results:
+                result["knowledge_base"] = kb.name
+            search_results.extend(kb_results)
+
+        search_results = sorted(
+            search_results,
+            key=lambda result: result.get("distance", 0)
+        )[:3]
         
         if search_results:
             context_parts = []
@@ -66,7 +86,8 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     system_prompt = ai_service.build_system_prompt(
         project_name=project.name,
         memories=memory_list,
-        knowledge_context=knowledge_context
+        knowledge_context=knowledge_context,
+        story_bible=story_bible_list
     )
     
     # Get conversation history
@@ -106,15 +127,35 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         context_used=context_used
     )
 
-@router.post("/api/search")
-def search_knowledge(request: SearchRequest):
-    """Search knowledge base"""
-    results = rag_service.search(
-        query=request.query,
-        kb_id=request.knowledge_base_id,
-        project_id=request.project_id,
-        top_k=request.top_k
-    )
+@router.post("/api/search", response_model=List[SearchResult])
+def search_knowledge(request: SearchRequest, db: Session = Depends(get_db)):
+    """Search one knowledge base or all knowledge bases in a project."""
+    if request.knowledge_base_id:
+        knowledge_bases = db.query(KnowledgeBase).filter(
+            KnowledgeBase.id == request.knowledge_base_id
+        ).all()
+    elif request.project_id:
+        knowledge_bases = db.query(KnowledgeBase).filter(
+            KnowledgeBase.project_id == request.project_id
+        ).all()
+    else:
+        raise HTTPException(status_code=400, detail="knowledge_base_id or project_id is required")
+
+    results = []
+    for kb in knowledge_bases:
+        kb_results = rag_service.search(
+            query=request.query,
+            knowledge_base_id=kb.id,
+            n_results=request.top_k
+        )
+        for result in kb_results:
+            result["knowledge_base"] = kb.name
+        results.extend(kb_results)
+
+    results = sorted(
+        results,
+        key=lambda result: result.get("distance", 0)
+    )[:request.top_k]
     
     return [
         SearchResult(

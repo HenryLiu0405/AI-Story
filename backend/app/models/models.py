@@ -20,6 +20,18 @@ class MessageRole(str, enum.Enum):
     ASSISTANT = "assistant"
     SYSTEM = "system"
 
+class StoryBibleCategory(str, enum.Enum):
+    CHARACTER = "character"
+    WORLD_RULE = "world_rule"
+    LOCATION = "location"
+    FACTION = "faction"
+    TIMELINE = "timeline"
+    PLOT_THREAD = "plot_thread"
+    FORESHADOWING = "foreshadowing"
+    THEME = "theme"
+    STYLE_RULE = "style_rule"
+    NOTE = "note"
+
 class Project(Base):
     __tablename__ = "projects"
     
@@ -33,6 +45,7 @@ class Project(Base):
     sessions = relationship("Session", back_populates="project", cascade="all, delete-orphan")
     memories = relationship("Memory", back_populates="project", cascade="all, delete-orphan")
     knowledge_bases = relationship("KnowledgeBase", back_populates="project", cascade="all, delete-orphan")
+    story_bible_entries = relationship("StoryBibleEntry", back_populates="project", cascade="all, delete-orphan")
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -72,6 +85,22 @@ class Memory(Base):
     
     # Relationships
     project = relationship("Project", back_populates="memories")
+
+class StoryBibleEntry(Base):
+    __tablename__ = "story_bible_entries"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    category = Column(SQLEnum(StoryBibleCategory), default=StoryBibleCategory.NOTE)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    source_type = Column(String(64), default="manual")
+    source_id = Column(String(36), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project", back_populates="story_bible_entries")
 
 class KnowledgeBase(Base):
     __tablename__ = "knowledge_bases"

@@ -120,3 +120,66 @@ export interface SearchResult {
   metadata: Record<string, any>;
   score: number;
 }
+
+// Story Bible
+export type StoryBibleCategory =
+  | 'character'
+  | 'world_rule'
+  | 'location'
+  | 'faction'
+  | 'timeline'
+  | 'plot_thread'
+  | 'foreshadowing'
+  | 'theme'
+  | 'style_rule'
+  | 'note';
+
+export interface StoryBibleEntry {
+  id: string;
+  project_id: string;
+  category: StoryBibleCategory;
+  title: string;
+  content: string;
+  source_type: string;
+  source_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStoryBibleEntryRequest {
+  category: StoryBibleCategory;
+  title: string;
+  content: string;
+  source_type?: string;
+  source_id?: string | null;
+}
+
+export interface UpdateStoryBibleEntryRequest {
+  category?: StoryBibleCategory;
+  title?: string;
+  content?: string;
+}
+
+export interface StoryBibleGenerateResponse {
+  entries: StoryBibleEntry[];
+  created_count: number;
+}
+
+// Consistency Check
+export interface ConsistencyCheckRequest {
+  text: string;
+  include_memories?: boolean;
+  include_story_bible?: boolean;
+}
+
+export interface ConsistencyIssue {
+  severity: 'low' | 'medium' | 'high' | string;
+  type: string;
+  issue: string;
+  evidence: string;
+  suggestion: string;
+}
+
+export interface ConsistencyCheckResponse {
+  issues: ConsistencyIssue[];
+}

@@ -5,6 +5,8 @@ from app.api.memories import router as memories_router
 from app.api.knowledge_bases import router as knowledge_bases_router
 from app.api.messages import router as messages_router
 from app.api.chat import router as chat_router
+from app.api.story_bible import router as story_bible_router
+from app.api.consistency import router as consistency_router
 
 __all__ = [
     "projects_router",
@@ -12,5 +14,7 @@ __all__ = [
     "memories_router",
     "knowledge_bases_router",
     "messages_router",
-    "chat_router"
+    "chat_router",
+    "story_bible_router",
+    "consistency_router"
 ]
