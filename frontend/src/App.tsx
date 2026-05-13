@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import toast, { Toaster } from 'react-hot-toast';
 import { useStore } from './context/StoreContext';
-import { chatApi, knowledgeBasesApi } from './services/api';
-import type { Memory, MemoryType } from './types';
+import { chatApi, knowledgeBasesApi, storyBibleApi, consistencyApi } from './services/api';
+import type { ConsistencyIssue, Memory, MemoryType, StoryBibleCategory, StoryBibleEntry } from './types';
 import './App.css';
 
 const memoryTypeLabels: Record<MemoryType, { label: string; icon: string }> = {
@@ -11,6 +11,19 @@ const memoryTypeLabels: Record<MemoryType, { label: string; icon: string }> = {
   world: { label: '世界观', icon: '🌍' },
   plot: { label: '剧情', icon: '📖' },
   custom: { label: '自定义', icon: '📝' },
+};
+
+const storyBibleCategoryLabels: Record<StoryBibleCategory, string> = {
+  character: '人物',
+  world_rule: '世界规则',
+  location: '地点',
+  faction: '势力',
+  timeline: '时间线',
+  plot_thread: '剧情线',
+  foreshadowing: '伏笔',
+  theme: '主题',
+  style_rule: '文风规则',
+  note: '笔记',
 };
 
 function App() {
@@ -43,10 +56,15 @@ function App() {
   const [showNewKBModal, setShowNewKBModal] = useState(false);
   const [showEditMemoryModal, setShowEditMemoryModal] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<'sessions' | 'memories' | 'knowledge'>('sessions');
+  const [sidebarTab, setSidebarTab] = useState<'sessions' | 'memories' | 'knowledge' | 'storyBible' | 'consistency'>('sessions');
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [uploadingKbId, setUploadingKbId] = useState<string | null>(null);
+  const [storyBibleEntries, setStoryBibleEntries] = useState<StoryBibleEntry[]>([]);
+  const [isGeneratingBible, setIsGeneratingBible] = useState(false);
+  const [consistencyText, setConsistencyText] = useState('');
+  const [consistencyIssues, setConsistencyIssues] = useState<ConsistencyIssue[]>([]);
+  const [isCheckingConsistency, setIsCheckingConsistency] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [newProjectName, setNewProjectName] = useState('');
@@ -68,6 +86,18 @@ function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!currentProject) {
+      setStoryBibleEntries([]);
+      setConsistencyIssues([]);
+      return;
+    }
+
+    storyBibleApi.getByProject(currentProject.id)
+      .then(setStoryBibleEntries)
+      .catch(() => toast.error('加载故事圣经失败'));
+  }, [currentProject]);
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
@@ -217,6 +247,58 @@ function App() {
     }
   };
 
+
+  const handleGenerateStoryBible = async () => {
+    if (!currentProject) return;
+
+    setIsGeneratingBible(true);
+    try {
+      const result = await storyBibleApi.generate(currentProject.id);
+      const entries = await storyBibleApi.getByProject(currentProject.id);
+      setStoryBibleEntries(entries);
+      toast.success(`已生成 ${result.created_count} 条故事圣经条目`);
+    } catch {
+      toast.error('生成故事圣经失败');
+    } finally {
+      setIsGeneratingBible(false);
+    }
+  };
+
+  const handleDeleteStoryBibleEntry = async (id: string) => {
+    if (!confirm('确定要删除这条故事圣经条目吗？')) return;
+
+    try {
+      await storyBibleApi.delete(id);
+      setStoryBibleEntries(prev => prev.filter(entry => entry.id !== id));
+      toast.success('故事圣经条目已删除');
+    } catch {
+      toast.error('删除故事圣经条目失败');
+    }
+  };
+
+  const handleConsistencyCheck = async () => {
+    if (!currentProject) return;
+    if (!consistencyText.trim()) {
+      toast.error('请先粘贴要检查的剧情或正文');
+      return;
+    }
+
+    setIsCheckingConsistency(true);
+    try {
+      const result = await consistencyApi.check(currentProject.id, {
+        text: consistencyText,
+        include_memories: true,
+        include_story_bible: true,
+      });
+      setConsistencyIssues(result.issues);
+      toast.success('一致性检查完成');
+    } catch {
+      toast.error('一致性检查失败');
+    } finally {
+      setIsCheckingConsistency(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !currentSession || !currentProject) return;
 
@@ -325,6 +407,18 @@ function App() {
                 >
                   知识库
                 </button>
+                <button
+                  className={`tab ${sidebarTab === 'storyBible' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('storyBible')}
+                >
+                  圣经
+                </button>
+                <button
+                  className={`tab ${sidebarTab === 'consistency' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('consistency')}
+                >
+                  检查
+                </button>
               </div>
 
               {/* Sessions Tab */}
@@ -423,6 +517,65 @@ function App() {
                   ))}
                 </div>
               )}
+
+              {/* Story Bible Tab */}
+              {sidebarTab === 'storyBible' && (
+                <div className="sidebar-section">
+                  <button
+                    className="btn btn-sm btn-secondary btn-block"
+                    onClick={handleGenerateStoryBible}
+                    disabled={isGeneratingBible}
+                  >
+                    {isGeneratingBible ? '生成中...' : '从记忆/会话生成'}
+                  </button>
+                  {storyBibleEntries.map((entry) => (
+                    <div key={entry.id} className="story-bible-item">
+                      <div className="story-bible-header">
+                        <div>
+                          <div className="story-bible-title">{entry.title}</div>
+                          <div className="story-bible-category">{storyBibleCategoryLabels[entry.category]}</div>
+                        </div>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => handleDeleteStoryBibleEntry(entry.id)}
+                          style={{ padding: '4px 8px' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="story-bible-content">{entry.content}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Consistency Tab */}
+              {sidebarTab === 'consistency' && (
+                <div className="sidebar-section">
+                  <textarea
+                    className="form-textarea consistency-textarea"
+                    placeholder="粘贴章节片段、剧情大纲或设定，检查是否与记忆/故事圣经冲突..."
+                    value={consistencyText}
+                    onChange={(e) => setConsistencyText(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-sm btn-secondary btn-block"
+                    onClick={handleConsistencyCheck}
+                    disabled={isCheckingConsistency}
+                  >
+                    {isCheckingConsistency ? '检查中...' : '检查一致性'}
+                  </button>
+                  {consistencyIssues.map((issue, index) => (
+                    <div key={`${issue.type}-${index}`} className={`consistency-issue severity-${issue.severity}`}>
+                      <div className="consistency-issue-title">{issue.issue}</div>
+                      <div className="consistency-issue-meta">{issue.type} · {issue.severity}</div>
+                      <div className="consistency-issue-body">证据：{issue.evidence}</div>
+                      <div className="consistency-issue-body">建议：{issue.suggestion}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
             </>
           )}
         </div>

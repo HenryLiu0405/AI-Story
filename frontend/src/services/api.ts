@@ -17,6 +17,12 @@ import type {
   ChatResponse,
   SearchRequest,
   SearchResult,
+  StoryBibleEntry,
+  CreateStoryBibleEntryRequest,
+  UpdateStoryBibleEntryRequest,
+  StoryBibleGenerateResponse,
+  ConsistencyCheckRequest,
+  ConsistencyCheckResponse,
 } from '../types';
 
 const api = axios.create({
@@ -84,6 +90,20 @@ export const chatApi = {
 // Search API
 export const searchApi = {
   search: (data: SearchRequest) => api.post<SearchResult[]>('/search', data).then(res => res.data),
+};
+
+// Story Bible API
+export const storyBibleApi = {
+  getByProject: (projectId: string) => api.get<StoryBibleEntry[]>(`/projects/${projectId}/story-bible`).then(res => res.data),
+  create: (projectId: string, data: CreateStoryBibleEntryRequest) => api.post<StoryBibleEntry>(`/projects/${projectId}/story-bible`, data).then(res => res.data),
+  generate: (projectId: string) => api.post<StoryBibleGenerateResponse>(`/projects/${projectId}/story-bible/generate`).then(res => res.data),
+  update: (id: string, data: UpdateStoryBibleEntryRequest) => api.put<StoryBibleEntry>(`/story-bible/${id}`, data).then(res => res.data),
+  delete: (id: string) => api.delete(`/story-bible/${id}`).then(res => res.data),
+};
+
+// Consistency API
+export const consistencyApi = {
+  check: (projectId: string, data: ConsistencyCheckRequest) => api.post<ConsistencyCheckResponse>(`/projects/${projectId}/consistency-check`, data).then(res => res.data),
 };
 
 export default api;

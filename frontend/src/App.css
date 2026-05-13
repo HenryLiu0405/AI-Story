@@ -423,6 +423,7 @@ body {
 /* Tabs */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 16px;
 }
@@ -573,4 +574,55 @@ body {
 
 .upload-control input {
   display: none;
+}
+
+/* Story Bible */
+.story-bible-item,
+.consistency-issue {
+  padding: 12px;
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.story-bible-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.story-bible-title,
+.consistency-issue-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.story-bible-category,
+.consistency-issue-meta {
+  font-size: 0.75rem;
+  color: var(--primary-color);
+}
+
+.story-bible-content,
+.consistency-issue-body {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.consistency-textarea {
+  min-height: 140px;
+  margin-bottom: 10px;
+}
+
+.consistency-issue.severity-high {
+  border-color: #ef4444;
+}
+
+.consistency-issue.severity-medium {
+  border-color: #f59e0b;
 }

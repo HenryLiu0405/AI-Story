@@ -48,7 +48,8 @@ class AIService:
         self,
         project_name: str,
         memories: List[Dict[str, str]],
-        knowledge_context: Optional[str] = None
+        knowledge_context: Optional[str] = None,
+        story_bible: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """Build system prompt with project context"""
         prompt_parts = [
@@ -61,6 +62,11 @@ class AIService:
             for mem in memories:
                 prompt_parts.append(f"\n【{mem['title']}】（{mem['type']}）\n{mem['content']}")
         
+        if story_bible:
+            prompt_parts.append("\n=== 故事圣经 ===")
+            for entry in story_bible:
+                prompt_parts.append(f"\n【{entry['title']}】（{entry['category']}）\n{entry['content']}")
+
         if knowledge_context:
             prompt_parts.append("\n=== 外部知识 ===")
             prompt_parts.append(knowledge_context)

@@ -7,7 +7,9 @@ from app.api import (
     memories_router,
     knowledge_bases_router,
     messages_router,
-    chat_router
+    chat_router,
+    story_bible_router,
+    consistency_router
 )
 
 # Create database tables
@@ -36,6 +38,8 @@ app.include_router(memories_router)
 app.include_router(knowledge_bases_router)
 app.include_router(messages_router)
 app.include_router(chat_router)
+app.include_router(story_bible_router)
+app.include_router(consistency_router)
 
 @app.get("/")
 def root():

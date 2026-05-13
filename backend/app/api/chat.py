@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.models.models import Message, Session as SessionModel, Project, Memory, KnowledgeBase
+from app.models.models import Message, Session as SessionModel, Project, Memory, KnowledgeBase, StoryBibleEntry
 from app.schemas.schemas import ChatRequest, ChatResponse, MessageResponse, SearchRequest, SearchResult
 from app.services.ai_service import ai_service
 from app.services.rag_service import rag_service
@@ -39,6 +39,15 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         for m in memories
     ]
     
+    # Get story bible entries
+    story_bible_entries = db.query(StoryBibleEntry).filter(
+        StoryBibleEntry.project_id == request.project_id
+    ).all()
+    story_bible_list = [
+        {"category": entry.category.value, "title": entry.title, "content": entry.content}
+        for entry in story_bible_entries
+    ]
+
     # Search knowledge base for relevant context
     knowledge_context = None
     context_used = []
@@ -77,7 +86,8 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     system_prompt = ai_service.build_system_prompt(
         project_name=project.name,
         memories=memory_list,
-        knowledge_context=knowledge_context
+        knowledge_context=knowledge_context,
+        story_bible=story_bible_list
     )
     
     # Get conversation history

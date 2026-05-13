@@ -6,3 +6,4 @@ backend/.env
 backend/*.db
 backend/chroma_db/
 backend/uploads/
+frontend/dist/
