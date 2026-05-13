@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
-import os
 
 from app.core.database import get_db
-from app.core.config import settings
 from app.models.models import KnowledgeBase, Document, Project
 from app.schemas.schemas import KnowledgeBaseCreate, KnowledgeBaseResponse, DocumentResponse
+from app.services.rag_service import rag_service
 
 router = APIRouter(tags=["knowledge_bases"])
 
@@ -47,6 +46,7 @@ def delete_knowledge_base(kb_id: str, db: Session = Depends(get_db)):
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     
+    rag_service.delete_knowledge_base(kb_id)
     db.delete(kb)
     db.commit()
     return {"message": "Knowledge base deleted successfully"}
@@ -81,16 +81,33 @@ async def upload_document(kb_id: str, file: UploadFile = File(...), db: Session 
     # Create document record
     db_doc = Document(
         knowledge_base_id=kb_id,
-        filename=file.filename,
+        filename=file.filename or "uploaded_document.txt",
         content=text_content,
-        metadata={"original_filename": file.filename}
+        doc_metadata={"original_filename": file.filename}
     )
     db.add(db_doc)
     db.commit()
     db.refresh(db_doc)
+
+    metadata = {
+        "filename": db_doc.filename,
+        "original_filename": file.filename or db_doc.filename,
+        "knowledge_base_id": kb_id,
+        "knowledge_base_name": kb.name,
+    }
+    indexed = rag_service.add_document(
+        knowledge_base_id=kb_id,
+        document_id=db_doc.id,
+        content=text_content,
+        metadata=metadata,
+    )
+    if not indexed:
+        db.delete(db_doc)
+        db.commit()
+        raise HTTPException(status_code=500, detail="Document uploaded but vector indexing failed")
     
     return {
         "id": db_doc.id,
         "filename": db_doc.filename,
-        "message": "Document uploaded successfully"
+        "message": "Document uploaded and indexed successfully"
     }
