@@ -1,254 +1,126 @@
-# AI Novel Companion - AI小说构思助手
+# 📖 AI-Story (AI 小说构思助手)
 
-一个功能强大的AI辅助小说创作平台，帮助作者进行人物设定、世界观搭建、剧情构思和灵感讨论。
+> **面向小说创作者的 AI 创作资产管理 + 连续性检查 + IP 孵化工作台**
 
-## 功能特性
+[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-RAG-orange.svg)](https://www.trychroma.com/)
+[![Python](https://img.shields.io/badge/Python-3.10+-yellow.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-### 📚 项目管理
-- 创建、编辑、删除多个小说项目
-- 每个项目独立管理创作内容
+AI-Story 并非单纯的“套壳对话框”，而是一个专为小说作者打造的**结构化创作辅助系统**。从灵感闪现到大纲推演，从角色设定管理到“吃书”防崩坏审查，甚至未来的作品宣发，AI-Story 致力于成为你创作路上的超级大脑。
 
-### 💬 会话管理
-- 每个项目支持多个独立会话
-- 会话包含完整的对话历史
-- 支持会话重命名和删除
+无论是网文作者、独立小说家，还是跑团(TRPG) DM，都能在这里构建属于自己的文字世界。
 
-### 🧠 共享记忆
-- 项目级别的记忆存储
-- 支持多种记忆类型：
-  - 👤 人物设定
-  - 🌍 世界观/背景设定
-  - 📖 剧情大纲
-  - 📝 自定义记忆
-- AI在对话时自动参考记忆内容
+---
 
-### 📚 RAG外挂知识库
-- 上传文档作为参考资料
-- 向量化存储，支持语义搜索
-- 对话时自动检索相关知识
-- 支持多个知识库管理
+## ✨ 核心亮点功能 (Current Features)
 
-### 🤖 AI对话
-- 实时AI对话功能
-- Markdown格式支持
-- 智能引用项目记忆和知识库
+* 🧠 **RAG 个人知识库介入 (RAG Knowledge Base)**
+    告别 AI 的“鱼的记忆”。上传你的灵感大纲、参考资料或过往废稿，系统采用本地向量化（Sentence-Transformers + ChromaDB），让 AI 助手完美掌握你的专属设定，拒绝“套路化”的通用回复。
+* 📚 **智能“故事圣经” (Story Bible)** `🔥New`
+    不再需要手动记录零散的设定！系统能自动从你与 AI 的对话中提取“近期剧情讨论摘要”，并映射为人物、世界观、剧情线等结构化数据，自动沉淀并固化你的小说资产。
+* 🛡️ **轻量级设定防崩坏审查 (Consistency Check)** `🔥New`
+    把刚写完的章节草稿丢进来，系统会自动比对“故事圣经”和“项目记忆”。角色称谓变了？时间线冲突了？AI 会像苛刻的编辑一样为你指出潜在的设定 Bug，防止“吃书”。
+* 📂 **结构化记忆管理 (Memories)**
+    直观地管理（人物 / 世界观 / 剧情 / 笔记）卡片，建立复杂而庞大的小说专属维基百科。
 
-## 技术栈
+---
 
-### 后端
-- **框架**: FastAPI
-- **数据库**: SQLite + SQLAlchemy
-- **向量数据库**: ChromaDB
-- **Embedding模型**: sentence-transformers
+## 🚀 演进路线图 (Roadmap)
 
-### 前端
-- **框架**: React 18 + TypeScript
-- **构建工具**: Vite
-- **HTTP客户端**: Axios
-- **Markdown渲染**: react-markdown
+我们正在快速迭代，以下是即将到来的杀手级特性：
 
-## 快速开始
+- [ ] **🔒 极致隐私与多模型支持 (Privacy First & Ollama Integration)**
+      重构 AI 服务层，支持一键切换本地开源模型（如 **Ollama**）。无需联网，你的商业稿件、未公开脑洞绝不上传云端，彻底打消隐私顾虑。同时支持 OpenAI/Claude/DeepSeek 等多提供商接入。
+- [ ] **📣 IP 内容宣发与孵化工作台 (IP Incubator)**
+      不仅帮你写书，还帮你推书！利用现成的“故事圣经”，一键生成：小红书/抖音角色海报文案、短视频分镜脚本、连载预告及读者互动话术。
+- [ ] **🕸️ 动态关系图谱可视化 (Dynamic Relationship Graph)**
+      将人物卡片与势力设定转化为可视化的交互网状图（基于 D3.js 或 ECharts），直观掌控全书角色羁绊。
+
+---
+
+## 🛠️ 系统架构与技术栈 (Tech Stack)
+
+本项目采用现代化的前后端分离架构：
+
+* **前端 (Frontend)**: 
+  * React 18 + TypeScript + Vite 
+  * 状态管理与路由配置完善，打造极速的 SPA 体验。
+* **后端 (Backend)**: 
+  * Python 3.10+ & FastAPI 
+  * SQLAlchemy ORM 结合 SQLite（提供极低的部署门槛，并支持平滑迁移至 PostgreSQL）。
+* **AI & 数据流 (AI & Data)**: 
+  * LangChain 框架
+  * ChromaDB 本地向量持久化
+  * Sentence-Transformers（轻量级本地 Embedding 方案）。
+
+---
+
+## 📦 快速开始 (Getting Started)
+
+### 前置要求 (Prerequisites)
+* [Node.js](https://nodejs.org/) (v16 或更高版本)
+* [Python](https://www.python.org/downloads/) (3.10 或更高版本)
+* 你的大模型 API Key（目前默认支持 OpenAI，即将支持本地 Ollama）
 
 ### 1. 克隆项目
-
 ```bash
-cd d:\Code
+git clone [https://github.com/HenryLiu0405/AI-Story.git](https://github.com/HenryLiu0405/AI-Story.git)
+cd AI-Story
 ```
 
-### 2. 设置后端
-
+### 2. 启动后端服务 (Backend)
 ```bash
 cd backend
 
-# 创建虚拟环境
+# 创建并激活虚拟环境
 python -m venv venv
-
-# 激活虚拟环境 (Windows)
-venv\Scripts\activate
+# Windows: venv\Scripts\activate
+# macOS/Linux: source venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
 
-# 复制环境配置
-copy .env.example .env
+# 配置环境变量
+cp .env.example .env
+# ⚠️ 注意: 请打开 .env 文件，填入你的 OPENAI_API_KEY 等配置信息
 
-# 编辑 .env 文件，填入你的 API Key
-# OPENAI_API_KEY=your-api-key-here
+# 初始化数据库并启动服务
+uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. 启动后端服务
-
-```bash
-cd backend
-python -m app.main
-```
-
-后端服务将在 http://localhost:8000 启动
-
-### 4. 设置前端
-
+### 3. 启动前端服务 (Frontend)
+打开一个新的终端窗口：
 ```bash
 cd frontend
-
-# 安装依赖
 npm install
-```
-
-### 5. 启动前端服务
-
-```bash
-cd frontend
 npm run dev
 ```
+打开浏览器访问 `http://localhost:5173` 即可开始你的创作之旅！
 
-前端应用将在 http://localhost:3000 启动
+---
 
-## 项目结构
+## 🎯 核心使用工作流 (Workflow)
 
-```
-d:\Code\
-├── SPEC.md                 # 项目规范文档
-├── README.md               # 项目说明文档
-│
-├── backend/                # Python FastAPI 后端
-│   ├── app/
-│   │   ├── api/           # API 路由
-│   │   │   ├── projects.py
-│   │   │   ├── sessions.py
-│   │   │   ├── memories.py
-│   │   │   ├── messages.py
-│   │   │   ├── knowledge_bases.py
-│   │   │   └── chat.py
-│   │   ├── core/          # 核心配置
-│   │   │   ├── config.py
-│   │   │   └── database.py
-│   │   ├── models/         # 数据模型
-│   │   │   └── models.py
-│   │   ├── schemas/        # Pydantic schemas
-│   │   │   └── schemas.py
-│   │   ├── services/       # 业务逻辑
-│   │   │   ├── ai_service.py
-│   │   │   └── rag_service.py
-│   │   └── main.py        # 应用入口
-│   ├── requirements.txt
-│   └── .env.example
-│
-└── frontend/               # React 前端
-    ├── src/
-    │   ├── components/     # React 组件
-    │   ├── context/        # 状态管理
-    │   │   └── StoreContext.tsx
-    │   ├── services/       # API 服务
-    │   │   └── api.ts
-    │   ├── types/          # TypeScript 类型
-    │   │   └── index.ts
-    │   ├── App.tsx         # 主组件
-    │   ├── App.css         # 样式
-    │   └── main.tsx        # 入口文件
-    ├── index.html
-    ├── package.json
-    ├── tsconfig.json
-    └── vite.config.ts
-```
+为了最大化 AI-Story 的效能，推荐按照以下流程使用：
 
-## API 文档
+1. **🏗️ 建立沙盒**：创建一个新的“项目 (Project)”，填写基础描述。
+2. **📝 喂养设定**：在“记忆 (Memories)”中添加男女主基础人设；在“知识库”中上传你的旧稿或灵感大纲。
+3. **💬 头脑风暴**：进入“会话 (Sessions)”与 AI 开始畅聊。系统会自动结合之前的记忆和知识库给出深度建议。
+4. **📥 沉淀圣经**：聊完一个大阶段后，点击生成“故事圣经 (Story Bible)”，系统会自动提取你们刚才讨论出的新设定并保存。
+5. **🔍 章节审查**：写完正文后，将文本复制进“一致性审查 (Consistency Check)”，让 AI 帮你扫描是否有设定冲突。
 
-启动后端服务后，访问以下地址查看API文档：
+---
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+## 🤝 参与贡献 (Contributing)
 
-### 主要API端点
+我们非常欢迎社区的力量！如果你有绝妙的 Idea 或发现了 Bug，可以通过以下方式参与：
 
-#### 项目管理
-- `GET /api/projects` - 获取所有项目
-- `POST /api/projects` - 创建项目
-- `GET /api/projects/{id}` - 获取单个项目
-- `PUT /api/projects/{id}` - 更新项目
-- `DELETE /api/projects/{id}` - 删除项目
+1. Fork 本仓库
+2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交你的修改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 发起一个 Pull Request
 
-#### 会话管理
-- `GET /api/projects/{project_id}/sessions` - 获取项目会话
-- `POST /api/projects/{project_id}/sessions` - 创建会话
-- `DELETE /api/sessions/{id}` - 删除会话
-
-#### 记忆管理
-- `GET /api/projects/{project_id}/memories` - 获取项目记忆
-- `POST /api/projects/{project_id}/memories` - 创建记忆
-- `PUT /api/memories/{id}` - 更新记忆
-- `DELETE /api/memories/{id}` - 删除记忆
-
-#### 知识库
-- `GET /api/projects/{project_id}/knowledge-bases` - 获取知识库
-- `POST /api/projects/{project_id}/knowledge-bases` - 创建知识库
-- `POST /api/knowledge-bases/{id}/upload` - 上传文档
-
-#### 对话
-- `POST /api/chat` - 发送消息获取AI回复
-
-## 使用流程
-
-### 1. 创建项目
-1. 点击侧边栏的"新建"按钮
-2. 输入项目名称和描述
-3. 进入项目详情页
-
-### 2. 管理记忆
-1. 切换到"记忆"标签
-2. 点击"添加记忆"
-3. 选择记忆类型（人物/世界观/剧情/自定义）
-4. 填写标题和内容
-5. AI会在对话中自动参考这些记忆
-
-### 3. 创建会话
-1. 切换到"会话"标签
-2. 点击"新建会话"
-3. 开始与AI对话创作
-
-### 4. 使用知识库
-1. 切换到"知识库"标签
-2. 创建知识库
-3. 上传参考文档
-4. AI会检索相关知识辅助创作
-
-## 配置说明
-
-### 环境变量 (.env)
-
-```env
-# OpenAI API 配置
-OPENAI_API_KEY=your-api-key-here
-OPENAI_API_BASE=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4
-
-# 数据库
-DATABASE_URL=sqlite:///./novel_companion.db
-
-# ChromaDB 向量数据库
-CHROMA_PERSIST_DIR=./chroma_db
-
-# 服务器
-HOST=0.0.0.0
-PORT=8000
-```
-
-## 开发说明
-
-### 添加新的记忆类型
-在 `backend/app/models/models.py` 中修改 `MemoryType` 枚举。
-
-### 添加新的API端点
-在 `backend/app/api/` 目录下添加新的路由文件。
-
-### 修改前端样式
-编辑 `frontend/src/App.css` 文件。
-
-## 注意事项
-
-1. 首次运行需要配置 OpenAI API Key
-2. 知识库功能需要下载 Embedding 模型（约 90MB）
-3. 建议使用 Chrome 或 Firefox 浏览器
-
-## License
-
-MIT License
+如果你有任何关于新奇功能的脑洞，也欢迎随时在 [Discussions] 中与我们交流探讨！
