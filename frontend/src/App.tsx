@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import toast, { Toaster } from 'react-hot-toast';
 import { useStore } from './context/StoreContext';
-import { chatApi } from './services/api';
+import { chatApi, knowledgeBasesApi } from './services/api';
 import type { Memory, MemoryType } from './types';
 import './App.css';
 
@@ -46,6 +46,7 @@ function App() {
   const [sidebarTab, setSidebarTab] = useState<'sessions' | 'memories' | 'knowledge'>('sessions');
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [uploadingKbId, setUploadingKbId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [newProjectName, setNewProjectName] = useState('');
@@ -186,6 +187,21 @@ function App() {
       toast.success('知识库创建成功');
     } catch {
       toast.error('创建知识库失败');
+    }
+  };
+
+
+  const handleUploadDocument = async (kbId: string, file: File | null) => {
+    if (!file) return;
+
+    setUploadingKbId(kbId);
+    try {
+      await knowledgeBasesApi.uploadDocument(kbId, file);
+      toast.success('文档上传并索引成功');
+    } catch {
+      toast.error('文档上传或索引失败');
+    } finally {
+      setUploadingKbId(null);
     }
   };
 
@@ -391,6 +407,18 @@ function App() {
                           ×
                         </button>
                       </div>
+                      <label className={`upload-control ${uploadingKbId === kb.id ? 'disabled' : ''}`}>
+                        <input
+                          type="file"
+                          accept=".txt,.md,.csv,.json,.log"
+                          disabled={uploadingKbId === kb.id}
+                          onChange={(e) => {
+                            handleUploadDocument(kb.id, e.target.files?.[0] ?? null);
+                            e.target.value = '';
+                          }}
+                        />
+                        {uploadingKbId === kb.id ? '索引中...' : '上传文档'}
+                      </label>
                     </div>
                   ))}
                 </div>

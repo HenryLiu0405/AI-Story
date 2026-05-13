@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -113,7 +113,7 @@ class DocumentResponse(BaseModel):
     id: str
     knowledge_base_id: str
     filename: str
-    metadata: dict
+    metadata: dict = Field(default_factory=dict, validation_alias="doc_metadata", serialization_alias="metadata")
     created_at: datetime
     
     class Config:
