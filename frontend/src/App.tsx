@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import toast, { Toaster } from 'react-hot-toast';
 import { useStore } from './context/StoreContext';
 import { chatApi, knowledgeBasesApi, storyBibleApi, consistencyApi } from './services/api';
-import type { ConsistencyIssue, Memory, MemoryType, StoryBibleCategory, StoryBibleEntry } from './types';
+import type { ConsistencyIssue, Document, Memory, MemoryType, StoryBibleCategory, StoryBibleEntry } from './types';
 import './App.css';
 
 const memoryTypeLabels: Record<MemoryType, { label: string; icon: string }> = {
@@ -65,6 +65,15 @@ function App() {
   const [consistencyText, setConsistencyText] = useState('');
   const [consistencyIssues, setConsistencyIssues] = useState<ConsistencyIssue[]>([]);
   const [isCheckingConsistency, setIsCheckingConsistency] = useState(false);
+  const [includeMemories, setIncludeMemories] = useState(true);
+  const [includeStoryBible, setIncludeStoryBible] = useState(true);
+  const [includeKnowledgeBase, setIncludeKnowledgeBase] = useState(false);
+  const [consistencyScope, setConsistencyScope] = useState<string[]>([]);
+  const [expandedKbId, setExpandedKbId] = useState<string | null>(null);
+  const [kbDocuments, setKbDocuments] = useState<Record<string, Document[]>>({});
+  const [kbSearchQuery, setKbSearchQuery] = useState<Record<string, string>>({});
+  const [kbSearchResults, setKbSearchResults] = useState<Record<string, any[]>>({});
+  const [kbSearching, setKbSearching] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [newProjectName, setNewProjectName] = useState('');
@@ -247,6 +256,55 @@ function App() {
     }
   };
 
+  const handleToggleKbExpand = async (kbId: string) => {
+    if (expandedKbId === kbId) {
+      setExpandedKbId(null);
+      return;
+    }
+    setExpandedKbId(kbId);
+    // Load documents if not already loaded
+    if (!kbDocuments[kbId]) {
+      try {
+        const docs = await knowledgeBasesApi.getDocuments(kbId);
+        setKbDocuments(prev => ({ ...prev, [kbId]: docs }));
+      } catch {
+        toast.error('加载文档列表失败');
+      }
+    }
+  };
+
+  const handleDeleteDocument = async (kbId: string, docId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('确定要删除这个文档吗？')) return;
+    try {
+      await knowledgeBasesApi.deleteDocument(kbId, docId);
+      setKbDocuments(prev => ({
+        ...prev,
+        [kbId]: (prev[kbId] || []).filter(d => d.id !== docId),
+      }));
+      toast.success('文档已删除');
+    } catch {
+      toast.error('删除文档失败');
+    }
+  };
+
+  const handleSearchKb = async (kbId: string) => {
+    const query = kbSearchQuery[kbId]?.trim();
+    if (!query) {
+      toast.error('请输入检索关键词');
+      return;
+    }
+    setKbSearching(prev => ({ ...prev, [kbId]: true }));
+    try {
+      const result = await knowledgeBasesApi.searchDocuments(kbId, { query });
+      setKbSearchResults(prev => ({ ...prev, [kbId]: result.results }));
+    } catch {
+      toast.error('检索失败');
+    } finally {
+      setKbSearching(prev => ({ ...prev, [kbId]: false }));
+    }
+  };
+
 
   const handleGenerateStoryBible = async () => {
     if (!currentProject) return;
@@ -276,6 +334,19 @@ function App() {
     }
   };
 
+  const handleToggleLock = async (entry: StoryBibleEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const updated = await storyBibleApi.update(entry.id, { locked: !entry.locked });
+      setStoryBibleEntries(prev =>
+        prev.map(e => e.id === entry.id ? { ...e, locked: updated.locked, confidence: updated.confidence } : e)
+      );
+      toast.success(updated.locked ? '条目已锁定' : '条目已解锁');
+    } catch {
+      toast.error('更新锁定状态失败');
+    }
+  };
+
   const handleConsistencyCheck = async () => {
     if (!currentProject) return;
     if (!consistencyText.trim()) {
@@ -287,8 +358,10 @@ function App() {
     try {
       const result = await consistencyApi.check(currentProject.id, {
         text: consistencyText,
-        include_memories: true,
-        include_story_bible: true,
+        include_memories: includeMemories,
+        include_story_bible: includeStoryBible,
+        include_knowledge_base: includeKnowledgeBase,
+        scope: consistencyScope.length > 0 ? consistencyScope : undefined,
       });
       setConsistencyIssues(result.issues);
       toast.success('一致性检查完成');
@@ -488,9 +561,15 @@ function App() {
                   </button>
                   {knowledgeBases.map((kb) => (
                     <div key={kb.id} className="card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }}
+                        onClick={() => handleToggleKbExpand(kb.id)}
+                      >
                         <div>
-                          <div className="card-title">📚 {kb.name}</div>
+                          <div className="card-title">
+                            <span style={{ marginRight: 4 }}>{expandedKbId === kb.id ? '📂' : '📚'}</span>
+                            {kb.name}
+                          </div>
                           <div className="card-meta">{kb.description || '暂无描述'}</div>
                         </div>
                         <button
@@ -501,18 +580,76 @@ function App() {
                           ×
                         </button>
                       </div>
-                      <label className={`upload-control ${uploadingKbId === kb.id ? 'disabled' : ''}`}>
-                        <input
-                          type="file"
-                          accept=".txt,.md,.csv,.json,.log"
-                          disabled={uploadingKbId === kb.id}
-                          onChange={(e) => {
-                            handleUploadDocument(kb.id, e.target.files?.[0] ?? null);
-                            e.target.value = '';
-                          }}
-                        />
-                        {uploadingKbId === kb.id ? '索引中...' : '上传文档'}
-                      </label>
+
+                      {expandedKbId === kb.id && (
+                        <div className="kb-expanded">
+                          {/* Upload */}
+                          <label className={`upload-control ${uploadingKbId === kb.id ? 'disabled' : ''}`}>
+                            <input
+                              type="file"
+                              accept=".txt,.md,.csv,.json,.log"
+                              disabled={uploadingKbId === kb.id}
+                              onChange={(e) => {
+                                handleUploadDocument(kb.id, e.target.files?.[0] ?? null);
+                                e.target.value = '';
+                                setTimeout(() => handleToggleKbExpand(kb.id), 500);
+                              }}
+                            />
+                            {uploadingKbId === kb.id ? '索引中...' : '上传文档'}
+                          </label>
+
+                          {/* Document List */}
+                          <div className="kb-doc-list">
+                            <div className="kb-section-title">文档列表 ({(kbDocuments[kb.id] || []).length})</div>
+                            {(kbDocuments[kb.id] || []).length === 0 ? (
+                              <div className="kb-empty">暂无文档</div>
+                            ) : (
+                              (kbDocuments[kb.id] || []).map(doc => (
+                                <div key={doc.id} className="kb-doc-item">
+                                  <span className="kb-doc-name">📄 {doc.filename}</span>
+                                  <span className="kb-doc-date">{formatDate(doc.created_at)}</span>
+                                  <button
+                                    className="btn btn-sm btn-secondary"
+                                    onClick={(e) => handleDeleteDocument(kb.id, doc.id, e)}
+                                    style={{ padding: '2px 6px', fontSize: '0.65rem' }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          {/* Retrieval Test */}
+                          <div className="kb-search-section">
+                            <div className="kb-section-title">检索测试</div>
+                            <div className="kb-search-row">
+                              <input
+                                className="form-input kb-search-input"
+                                placeholder="输入关键词测试检索..."
+                                value={kbSearchQuery[kb.id] || ''}
+                                onChange={(e) => setKbSearchQuery(prev => ({ ...prev, [kb.id]: e.target.value }))}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearchKb(kb.id)}
+                              />
+                              <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleSearchKb(kb.id)}
+                                disabled={kbSearching[kb.id]}
+                              >
+                                {kbSearching[kb.id] ? '搜索中...' : '搜索'}
+                              </button>
+                            </div>
+                            {(kbSearchResults[kb.id] || []).map((result, idx) => (
+                              <div key={idx} className="kb-search-result">
+                                <div className="kb-search-score">
+                                  相关度: {(result.distance !== undefined ? Math.max(0, (1 - result.distance) * 100) : 0).toFixed(1)}%
+                                </div>
+                                <div className="kb-search-content">{result.content?.slice(0, 200)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -529,11 +666,29 @@ function App() {
                     {isGeneratingBible ? '生成中...' : '从记忆/会话生成'}
                   </button>
                   {storyBibleEntries.map((entry) => (
-                    <div key={entry.id} className="story-bible-item">
+                    <div key={entry.id} className={`story-bible-item${entry.locked ? ' locked' : ''}`}>
                       <div className="story-bible-header">
                         <div>
-                          <div className="story-bible-title">{entry.title}</div>
-                          <div className="story-bible-category">{storyBibleCategoryLabels[entry.category]}</div>
+                          <div className="story-bible-title">
+                            <span
+                              className="lock-toggle"
+                              onClick={(e) => handleToggleLock(entry, e)}
+                              title={entry.locked ? '点击解锁' : '点击锁定'}
+                              style={{ cursor: 'pointer', marginRight: 6, fontSize: 14 }}
+                            >
+                              {entry.locked ? '🔒' : '🔓'}
+                            </span>
+                            {entry.title}
+                            {entry.confidence < 1.0 && (
+                              <span className="confidence-badge" title="AI 置信度">
+                                {Math.round(entry.confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
+                          <div className="story-bible-category">
+                            {storyBibleCategoryLabels[entry.category]}
+                            {entry.locked && <span className="locked-label"> · 已锁定</span>}
+                          </div>
                         </div>
                         <button
                           className="btn btn-sm btn-secondary"
@@ -558,6 +713,50 @@ function App() {
                     value={consistencyText}
                     onChange={(e) => setConsistencyText(e.target.value)}
                   />
+                  <div className="consistency-controls">
+                    <label className="toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={includeMemories}
+                        onChange={(e) => setIncludeMemories(e.target.checked)}
+                      />
+                      包含记忆
+                    </label>
+                    <label className="toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={includeStoryBible}
+                        onChange={(e) => setIncludeStoryBible(e.target.checked)}
+                      />
+                      包含故事圣经
+                    </label>
+                    <label className="toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={includeKnowledgeBase}
+                        onChange={(e) => setIncludeKnowledgeBase(e.target.checked)}
+                      />
+                      包含知识库
+                    </label>
+                  </div>
+                  <div className="scope-selector">
+                    <span className="scope-label">限定范围（可选）：</span>
+                    <div className="scope-chips">
+                      {(['character', 'world_rule', 'timeline', 'plot', 'style'] as const).map(s => (
+                        <button
+                          key={s}
+                          className={`scope-chip ${consistencyScope.includes(s) ? 'active' : ''}`}
+                          onClick={() =>
+                            setConsistencyScope(prev =>
+                              prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+                            )
+                          }
+                        >
+                          {{ character: '人物', world_rule: '世界规则', timeline: '时间线', plot: '剧情', style: '文风' }[s]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <button
                     className="btn btn-sm btn-secondary btn-block"
                     onClick={handleConsistencyCheck}

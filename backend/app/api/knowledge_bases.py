@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.core.database import get_db
 from app.models.models import KnowledgeBase, Document, Project
@@ -8,6 +9,10 @@ from app.schemas.schemas import KnowledgeBaseCreate, KnowledgeBaseResponse, Docu
 from app.services.rag_service import rag_service
 
 router = APIRouter(tags=["knowledge_bases"])
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
 
 @router.post("/api/projects/{project_id}/knowledge-bases", response_model=KnowledgeBaseResponse)
 def create_knowledge_base(project_id: str, kb: KnowledgeBaseCreate, db: Session = Depends(get_db)):
@@ -111,3 +116,34 @@ async def upload_document(kb_id: str, file: UploadFile = File(...), db: Session 
         "filename": db_doc.filename,
         "message": "Document uploaded and indexed successfully"
     }
+
+
+@router.delete("/api/knowledge-bases/{kb_id}/documents/{doc_id}")
+def delete_document(kb_id: str, doc_id: str, db: Session = Depends(get_db)):
+    """Delete a document from a knowledge base"""
+    kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id).first()
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    doc = db.query(Document).filter(
+        Document.id == doc_id,
+        Document.knowledge_base_id == kb_id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    rag_service.delete_document(kb_id, doc_id)
+    db.delete(doc)
+    db.commit()
+    return {"message": "Document deleted successfully"}
+
+
+@router.post("/api/knowledge-bases/{kb_id}/search")
+def search_knowledge_base(kb_id: str, request: SearchRequest, db: Session = Depends(get_db)):
+    """Search a knowledge base for relevant documents (retrieval test)"""
+    kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id).first()
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    results = rag_service.search(request.query, kb_id, n_results=request.top_k or 5)
+    return {"results": results}

@@ -95,6 +95,24 @@ export interface Document {
   created_at: string;
 }
 
+export interface DocumentSearchRequest {
+  query: string;
+  top_k?: number;
+}
+
+export interface DocumentSearchResult {
+  id: string;
+  content: string;
+  metadata: Record<string, any>;
+  distance: number;
+  knowledge_base_id: string;
+  knowledge_base: string;
+}
+
+export interface DocumentSearchResponse {
+  results: DocumentSearchResult[];
+}
+
 // Chat
 export interface ChatRequest {
   session_id: string;
@@ -142,6 +160,8 @@ export interface StoryBibleEntry {
   content: string;
   source_type: string;
   source_id?: string | null;
+  locked: boolean;
+  confidence: number;
   created_at: string;
   updated_at: string;
 }
@@ -152,12 +172,16 @@ export interface CreateStoryBibleEntryRequest {
   content: string;
   source_type?: string;
   source_id?: string | null;
+  locked?: boolean;
+  confidence?: number;
 }
 
 export interface UpdateStoryBibleEntryRequest {
   category?: StoryBibleCategory;
   title?: string;
   content?: string;
+  locked?: boolean;
+  confidence?: number;
 }
 
 export interface StoryBibleGenerateResponse {
@@ -170,6 +194,8 @@ export interface ConsistencyCheckRequest {
   text: string;
   include_memories?: boolean;
   include_story_bible?: boolean;
+  include_knowledge_base?: boolean;
+  scope?: string[];
 }
 
 export interface ConsistencyIssue {

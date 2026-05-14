@@ -162,17 +162,23 @@ class StoryBibleEntryBase(BaseModel):
 class StoryBibleEntryCreate(StoryBibleEntryBase):
     source_type: Optional[str] = "manual"
     source_id: Optional[str] = None
+    locked: Optional[bool] = False
+    confidence: Optional[float] = 1.0
 
 class StoryBibleEntryUpdate(BaseModel):
     category: Optional[StoryBibleCategoryEnum] = None
     title: Optional[str] = None
     content: Optional[str] = None
+    locked: Optional[bool] = None
+    confidence: Optional[float] = None
 
 class StoryBibleEntryResponse(StoryBibleEntryBase):
     id: str
     project_id: str
     source_type: str
     source_id: Optional[str] = None
+    locked: bool
+    confidence: float
     created_at: datetime
     updated_at: datetime
 
@@ -188,10 +194,12 @@ class ConsistencyCheckRequest(BaseModel):
     text: str
     include_memories: bool = True
     include_story_bible: bool = True
+    include_knowledge_base: bool = False
+    scope: Optional[List[str]] = None  # e.g. ["character", "timeline", "world_rule"]
 
 class ConsistencyIssue(BaseModel):
-    severity: str
-    type: str
+    severity: str  # low / medium / high
+    type: str      # character / timeline / world_rule / plot / style / general
     issue: str
     evidence: str
     suggestion: str

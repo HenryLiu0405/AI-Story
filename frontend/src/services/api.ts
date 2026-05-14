@@ -13,6 +13,8 @@ import type {
   KnowledgeBase,
   CreateKnowledgeBaseRequest,
   Document,
+  DocumentSearchRequest,
+  DocumentSearchResponse,
   ChatRequest,
   ChatResponse,
   SearchRequest,
@@ -71,6 +73,8 @@ export const knowledgeBasesApi = {
   create: (data: CreateKnowledgeBaseRequest) => api.post<KnowledgeBase>(`/projects/${data.project_id}/knowledge-bases`, data).then(res => res.data),
   delete: (id: string) => api.delete(`/knowledge-bases/${id}`).then(res => res.data),
   getDocuments: (id: string) => api.get<Document[]>(`/knowledge-bases/${id}/documents`).then(res => res.data),
+  deleteDocument: (kbId: string, docId: string) => api.delete(`/knowledge-bases/${kbId}/documents/${docId}`).then(res => res.data),
+  searchDocuments: (kbId: string, data: DocumentSearchRequest) => api.post<DocumentSearchResponse>(`/knowledge-bases/${kbId}/search`, data).then(res => res.data),
   uploadDocument: (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);

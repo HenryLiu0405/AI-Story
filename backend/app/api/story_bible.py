@@ -62,14 +62,18 @@ def generate_story_bible(project_id: str, db: Session = Depends(get_db)):
 
     generated_entries = story_bible_service.build_entries_from_project(memories, messages)
     existing_keys = {
-        (entry.source_type, entry.source_id, entry.title)
+        (entry.source_type, entry.source_id, entry.title, entry.locked)
         for entry in db.query(StoryBibleEntry).filter(StoryBibleEntry.project_id == project_id).all()
     }
 
     created_entries = []
     for entry in generated_entries:
         key = (entry.get("source_type"), entry.get("source_id"), entry.get("title"))
-        if key in existing_keys:
+        # Check if any existing entry with this key is locked
+        if (key[0], key[1], key[2], True) in existing_keys:
+            continue
+        # Check if any existing entry with this key exists (unlocked also skipped for duplicate)
+        if (key[0], key[1], key[2], False) in existing_keys:
             continue
 
         db_entry = StoryBibleEntry(project_id=project_id, **entry)
@@ -96,6 +100,10 @@ def update_story_bible_entry(entry_id: str, entry_update: StoryBibleEntryUpdate,
         entry.title = entry_update.title
     if entry_update.content is not None:
         entry.content = entry_update.content
+    if entry_update.locked is not None:
+        entry.locked = entry_update.locked
+    if entry_update.confidence is not None:
+        entry.confidence = entry_update.confidence
 
     db.commit()
     db.refresh(entry)

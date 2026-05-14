@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SQLEnum, JSON, Boolean, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -96,6 +96,8 @@ class StoryBibleEntry(Base):
     content = Column(Text, nullable=False)
     source_type = Column(String(64), default="manual")
     source_id = Column(String(36), nullable=True)
+    locked = Column(Boolean, default=False)
+    confidence = Column(Float, default=1.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

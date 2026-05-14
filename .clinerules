@@ -1,0 +1,104 @@
+# AI-Story Cline Rules
+
+你是接入 DeepSeek V4 Pro 的 VS Code/Copilot AI Coding 助手。请把本项目当作一个面向小说作者的「AI 创作资产管理 + 故事连续性检查 + 可分享 IP 孵化工作台」来迭代，而不是普通聊天机器人。
+
+## 1. 产品定位
+
+- 核心价值：帮助作者管理创作资产、守住故事设定、延续个人文风，并把作品沉淀为可展示、可传播、可复用的 IP 资产。
+- 差异化方向：不要只做「AI 代写全文」；优先做「Story Bible、剧情一致性、角色访谈、时间线、关系图谱、文风 DNA、企划案、模板社区」。
+- 用户心智：AI-Story 是作者的编辑、资料管理员、世界观秘书和宣发助手，不是替代作者的枪手。
+- 重要原则：所有 AI 输出都应帮助作者保持原创性、故事连续性和个人风格，避免制造 AI slop。
+
+## 2. 当前项目事实
+
+- 前端：`frontend/`，React 18 + TypeScript + Vite。
+- 后端：`backend/`，FastAPI + SQLAlchemy + SQLite。
+- 现有核心能力：项目、会话、消息、记忆、知识库、RAG、AI 对话、Story Bible、一致性检查。
+- 主要后端入口：`backend/app/main.py`。
+- 主要前端入口：`frontend/src/App.tsx`。
+- 类型定义：`frontend/src/types/index.ts`。
+- API 客户端：`frontend/src/services/api.ts`。
+- 数据模型：`backend/app/models/models.py`。
+- Pydantic Schema：`backend/app/schemas/schemas.py`。
+- 详细产品规格和路线图：优先阅读仓库根目录 `spec.md`。
+
+## 3. 开发优先级
+
+按以下顺序规划和实现功能，除非用户明确指定其他任务：
+
+1. Story Bible 自动生成器与维护体验增强。
+2. 剧情一致性检查器增强。
+3. 前端知识库文档管理增强。
+4. 角色访谈 / 角色扮演模拟器。
+5. 小说企划案 / 投稿包 / 分享页。
+6. 章节、场景和修订工作流。
+7. 创作模板库 / 模板分享机制。
+8. 作者风格 DNA / 文风锁定。
+9. 多模型 Provider / 本地模型隐私模式。
+10. 内容传播助手。
+
+## 4. 代码组织约定
+
+### 后端
+
+- 每个新业务模块优先按三层拆分：
+  - `backend/app/api/<feature>.py`：FastAPI 路由，只做鉴权、参数接收、错误转换和服务调用。
+  - `backend/app/services/<feature>_service.py`：业务逻辑、AI prompt 组装、RAG 检索、结构化结果解析。
+  - `backend/app/models/models.py` 与 `backend/app/schemas/schemas.py`：数据库模型和请求/响应类型。
+- 新增 router 后，必须在 `backend/app/api/__init__.py` 导出，并在 `backend/app/main.py` include。
+- API 路径风格优先采用：
+  - 项目级集合：`/api/projects/{project_id}/<resource>`
+  - 单资源操作：`/api/<resource>/{id}`
+- 结构化 AI 返回必须定义 Pydantic schema，不要让前端解析自由文本。
+- 与 AI 相关的逻辑集中在 service 层，不要在 route 中直接写长 prompt。
+- 所有项目级查询必须按 `project_id` 隔离，避免跨项目泄露设定或稿件。
+- 当前数据库初始化使用 `Base.metadata.create_all(bind=engine)`；新增模型时要考虑已有 SQLite 数据库的兼容性，必要时提供迁移说明或开发环境重建说明。
+
+### 前端
+
+- 小功能可先集成到 `frontend/src/App.tsx`，但中大型功能优先拆分为 `frontend/src/components/<Feature>.tsx`。
+- 所有后端类型优先同步到 `frontend/src/types/index.ts`，API 调用统一放在 `frontend/src/services/api.ts`。
+- UI 文案以中文为主，保持作者工具的语气：清晰、克制、鼓励创作，不夸大 AI 能力。
+- 新增异步操作应提供 loading、成功 toast、失败 toast 和空状态。
+- 不要把 API Key 或敏感内容写入前端源码；涉及模型配置时应通过后端代理或设置接口处理。
+
+## 5. AI 功能设计原则
+
+- Prompt 必须明确输出 JSON 结构，并要求无法判断时返回空数组或低置信度，不要编造设定。
+- Story Bible、记忆、知识库、章节稿件的优先级建议：
+  1. 用户当前指令。
+  2. 锁定/人工编辑过的 Story Bible 条目。
+  3. 项目记忆。
+  4. 相关知识库/RAG 片段。
+  5. 最近会话历史。
+- 一致性检查应指出风险和证据，不要直接覆盖作者文本。
+- 角色访谈必须保持角色内回答；如问题涉及未定义信息，应以「可能」「我会倾向于」等方式表达，或提出需要作者确认的新设定。
+- 文风 DNA 只用于辅助保持作者风格，不应承诺完全复刻任何在世作者或受版权保护作品的风格。
+
+## 6. 隐私与安全
+
+- 小说稿件、未公开设定、投稿材料默认视为敏感内容。
+- 多模型/本地模型模式中，UI 必须清楚告知内容会发送到哪里。
+- 日志中不要打印完整用户稿件、API Key、模型返回全文或上传文档全文。
+- 上传文件、导出分享页、公开模板等功能必须区分私有与公开状态。
+
+## 7. 验收标准
+
+实现功能时至少满足：
+
+- 后端 route、schema、service、model 职责清晰。
+- 前端有可用入口、空状态、错误提示和加载状态。
+- API 类型和前端 TypeScript 类型保持一致。
+- 新功能能够与当前项目、记忆、知识库、Story Bible、聊天工作流协同。
+- 运行基础检查：
+  - `python -m compileall backend/app`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+
+## 8. 禁止事项
+
+- 不要把项目做成只有「生成一段小说」的通用聊天壳。
+- 不要在 import 外包裹 try/catch。
+- 不要提交真实 API Key、`.env`、数据库文件、上传稿件或构建产物。
+- 不要绕过现有 API 客户端，直接在组件中散落 axios 调用。
+- 不要让 AI 自由文本结果成为唯一数据源；关键资产必须可编辑、可删除、可追溯。
