@@ -2,8 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import toast, { Toaster } from 'react-hot-toast';
 import { useStore } from './context/StoreContext';
-import { chatApi, knowledgeBasesApi, storyBibleApi, consistencyApi } from './services/api';
-import type { ConsistencyIssue, Document, Memory, MemoryType, StoryBibleCategory, StoryBibleEntry } from './types';
+import { chatApi, knowledgeBasesApi, storyBibleApi, consistencyApi, settingsApi, pitchApi, templatesApi } from './services/api';
+import type { AIModelInfo, AIProvider, Chapter, ChapterStatus, ConsistencyIssue, Document, Memory, MemoryType, PitchGenerateResponse, ProjectTemplate, StoryBibleCategory, StoryBibleEntry, TemplateGenre } from './types';
+import CharacterInterview from './components/CharacterInterview';
+import TemplateGallery from './components/TemplateGallery';
+import AuthorStylePanel from './components/AuthorStylePanel';
+import PromotionPanel from './components/PromotionPanel';
 import './App.css';
 
 const memoryTypeLabels: Record<MemoryType, { label: string; icon: string }> = {
@@ -35,6 +39,7 @@ function App() {
     memories,
     knowledgeBases,
     messages,
+    chapters,
     loadProjects,
     createProject,
     deleteProject,
@@ -48,6 +53,10 @@ function App() {
     createKnowledgeBase,
     deleteKnowledgeBase,
     loadMessages,
+    loadChapters,
+    createChapter,
+    updateChapter,
+    deleteChapter,
   } = useStore();
 
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -56,7 +65,9 @@ function App() {
   const [showNewKBModal, setShowNewKBModal] = useState(false);
   const [showEditMemoryModal, setShowEditMemoryModal] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<'sessions' | 'memories' | 'knowledge' | 'storyBible' | 'consistency'>('sessions');
+  const [showInterviewPanel, setShowInterviewPanel] = useState(false);
+  const [interviewMemory, setInterviewMemory] = useState<Memory | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'sessions' | 'memories' | 'knowledge' | 'storyBible' | 'consistency' | 'chapters' | 'pitch' | 'styleProfile' | 'promotion'>('sessions');
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [uploadingKbId, setUploadingKbId] = useState<string | null>(null);
@@ -69,6 +80,8 @@ function App() {
   const [includeStoryBible, setIncludeStoryBible] = useState(true);
   const [includeKnowledgeBase, setIncludeKnowledgeBase] = useState(false);
   const [consistencyScope, setConsistencyScope] = useState<string[]>([]);
+  const [isGeneratingPitch, setIsGeneratingPitch] = useState(false);
+  const [pitchData, setPitchData] = useState<PitchGenerateResponse | null>(null);
   const [expandedKbId, setExpandedKbId] = useState<string | null>(null);
   const [kbDocuments, setKbDocuments] = useState<Record<string, Document[]>>({});
   const [kbSearchQuery, setKbSearchQuery] = useState<Record<string, string>>({});
@@ -87,6 +100,41 @@ function App() {
   const [editMemoryContent, setEditMemoryContent] = useState('');
   const [newKbName, setNewKbName] = useState('');
   const [newKbDesc, setNewKbDesc] = useState('');
+
+  // Template state
+  const [createMode, setCreateMode] = useState<'blank' | 'template'>('blank');
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate | null>(null);
+  const [isExportingTemplate, setIsExportingTemplate] = useState(false);
+  const [showExportTemplateModal, setShowExportTemplateModal] = useState(false);
+  const [exportTemplateName, setExportTemplateName] = useState('');
+  const [exportTemplateDesc, setExportTemplateDesc] = useState('');
+  const [exportTemplateGenre, setExportTemplateGenre] = useState<TemplateGenre>('xuanhuan');
+
+  // Settings modal state
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsProvider, setSettingsProvider] = useState<AIProvider>('openai');
+  const [settingsApiKey, setSettingsApiKey] = useState('');
+  const [settingsBaseUrl, setSettingsBaseUrl] = useState('');
+  const [settingsModel, setSettingsModel] = useState('');
+  const [settingsModels, setSettingsModels] = useState<AIModelInfo[]>([]);
+  const [settingsCurrentProvider, setSettingsCurrentProvider] = useState<AIProvider>('openai');
+  const [settingsCurrentModel, setSettingsCurrentModel] = useState('');
+  const [settingsIsLocal, setSettingsIsLocal] = useState(false);
+  const [settingsIsConfigured, setSettingsIsConfigured] = useState(false);
+  const [settingsTestResult, setSettingsTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [settingsTesting, setSettingsTesting] = useState(false);
+
+  // Chapter state
+  const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
+  const [editChapterTitle, setEditChapterTitle] = useState('');
+  const [editChapterSummary, setEditChapterSummary] = useState('');
+  const [editChapterContent, setEditChapterContent] = useState('');
+  const [editChapterStatus, setEditChapterStatus] = useState<ChapterStatus>('outline');
+  const [showNewChapterModal, setShowNewChapterModal] = useState(false);
+  const [newChapterTitle, setNewChapterTitle] = useState('');
+  const [isSavingChapter, setIsSavingChapter] = useState(false);
+  const [chapterView, setChapterView] = useState<'list' | 'editor'>('list');
 
   useEffect(() => {
     loadProjects();
@@ -109,6 +157,27 @@ function App() {
   }, [currentProject]);
 
   const handleCreateProject = async () => {
+    if (createMode === 'template' && selectedTemplate) {
+      // Create from template
+      try {
+        const project = await templatesApi.createProject(selectedTemplate.id, {
+          name_override: newProjectName.trim() || undefined,
+        });
+        setShowNewProjectModal(false);
+        setNewProjectName('');
+        setNewProjectDesc('');
+        setSelectedTemplate(null);
+        setCreateMode('blank');
+        // Reload projects list and select the new project
+        await loadProjects();
+        selectProject(project);
+        toast.success('项目创建成功');
+      } catch {
+        toast.error('从模板创建项目失败');
+      }
+      return;
+    }
+
     if (!newProjectName.trim()) {
       toast.error('请输入项目名称');
       return;
@@ -122,6 +191,37 @@ function App() {
       toast.success('项目创建成功');
     } catch {
       toast.error('创建项目失败');
+    }
+  };
+
+  const handleSelectTemplate = (template: ProjectTemplate) => {
+    setSelectedTemplate(template);
+    setNewProjectName(template.name);
+    setShowTemplateGallery(false);
+  };
+
+  const handleExportTemplate = async () => {
+    if (!currentProject) return;
+    if (!exportTemplateName.trim()) {
+      toast.error('请输入模板名称');
+      return;
+    }
+    setIsExportingTemplate(true);
+    try {
+      await templatesApi.exportProject(currentProject.id, {
+        name: exportTemplateName,
+        description: exportTemplateDesc,
+        genre: exportTemplateGenre,
+        is_public: false,
+      });
+      setShowExportTemplateModal(false);
+      setExportTemplateName('');
+      setExportTemplateDesc('');
+      toast.success('模板导出成功');
+    } catch {
+      toast.error('导出模板失败');
+    } finally {
+      setIsExportingTemplate(false);
     }
   };
 
@@ -372,6 +472,214 @@ function App() {
     }
   };
 
+  const handleGeneratePitch = async () => {
+    if (!currentProject) return;
+    setIsGeneratingPitch(true);
+    try {
+      const result = await pitchApi.generate(currentProject.id);
+      setPitchData(result);
+      toast.success('企划案生成完成');
+    } catch {
+      toast.error('企划案生成失败，请检查 AI 服务配置');
+    } finally {
+      setIsGeneratingPitch(false);
+    }
+  };
+
+  const handleCopyPitchMarkdown = () => {
+    if (!pitchData) return;
+    const projectName = currentProject?.name || '未命名项目';
+    const md = [
+      `# 📋 企划案：《${projectName}》`,
+      '',
+      '## 一句话梗概',
+      pitchData.logline || '（暂无）',
+      '',
+      '## 故事简介',
+      pitchData.synopsis || '（暂无）',
+      '',
+      '## 卖点',
+      ...(pitchData.selling_points?.length
+        ? pitchData.selling_points.map((s: string) => `- ${s}`)
+        : ['- （暂无）']),
+      '',
+      '## 主要角色',
+      ...(pitchData.main_characters?.length
+        ? pitchData.main_characters.map(
+            (c: { name: string; role: string; description: string }) =>
+              `- **${c.name}**（${c.role}）：${c.description}`
+          )
+        : ['- （暂无）']),
+      '',
+      '## 世界观摘要',
+      pitchData.world_summary || '（暂无）',
+      '',
+      '## 目标读者',
+      pitchData.target_audience || '（暂无）',
+      '',
+      '## 封面/海报提示词',
+      '```',
+      pitchData.cover_prompt || '（暂无）',
+      '```',
+      '',
+      '## 社媒宣传文案',
+      ...(pitchData.social_posts?.length
+        ? pitchData.social_posts.map((s: string) => `- ${s}`)
+        : ['- （暂无）']),
+    ].join('\n');
+
+    navigator.clipboard.writeText(md).then(
+      () => toast.success('企划案 Markdown 已复制到剪贴板'),
+      () => toast.error('复制失败，请手动复制')
+    );
+  };
+
+  // Settings handlers
+  const handleOpenSettings = async () => {
+    try {
+      const [modelsRes, statusRes] = await Promise.all([
+        settingsApi.getModels(),
+        settingsApi.getProviderStatus(),
+      ]);
+      setSettingsModels(modelsRes.models);
+      setSettingsCurrentProvider(modelsRes.current_provider);
+      setSettingsCurrentModel(modelsRes.current_model);
+      setSettingsProvider(modelsRes.current_provider);
+      setSettingsModel(modelsRes.current_model);
+      setSettingsIsLocal(statusRes.is_local);
+      setSettingsIsConfigured(statusRes.is_configured);
+
+      // Pre-fill default URLs for the current provider
+      if (modelsRes.current_provider === 'ollama') {
+        setSettingsBaseUrl('http://localhost:11434/v1');
+        setSettingsApiKey('');
+      } else if (modelsRes.current_provider === 'deepseek') {
+        setSettingsBaseUrl('https://api.deepseek.com/v1');
+        setSettingsApiKey('');
+      } else {
+        setSettingsBaseUrl('https://api.openai.com/v1');
+        setSettingsApiKey('');
+      }
+      setSettingsTestResult(null);
+    } catch {
+      toast.error('加载设置失败');
+      return;
+    }
+    setShowSettingsModal(true);
+  };
+
+  const handleProviderChange = (provider: AIProvider) => {
+    setSettingsProvider(provider);
+    setSettingsTestResult(null);
+    if (provider === 'ollama') {
+      setSettingsBaseUrl('http://localhost:11434/v1');
+      setSettingsApiKey('');
+    } else if (provider === 'deepseek') {
+      setSettingsBaseUrl('https://api.deepseek.com/v1');
+      setSettingsApiKey('');
+    } else {
+      setSettingsBaseUrl('https://api.openai.com/v1');
+      setSettingsApiKey('');
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!settingsApiKey.trim() && settingsProvider !== 'ollama') {
+      toast.error('请输入 API Key');
+      return;
+    }
+    setSettingsTesting(true);
+    setSettingsTestResult(null);
+    try {
+      const result = await settingsApi.testConnection({
+        provider: settingsProvider,
+        api_key: settingsApiKey,
+        base_url: settingsBaseUrl,
+        model: settingsModel,
+      });
+      setSettingsTestResult(result);
+    } catch {
+      setSettingsTestResult({ success: false, message: '请求失败，请检查网络连接' });
+    } finally {
+      setSettingsTesting(false);
+    }
+  };
+
+  // Chapter handlers
+  const handleSelectChapter = (chapter: Chapter) => {
+    setSelectedChapter(chapter);
+    setEditChapterTitle(chapter.title);
+    setEditChapterSummary(chapter.summary);
+    setEditChapterContent(chapter.content);
+    setEditChapterStatus(chapter.status);
+    setChapterView('editor');
+  };
+
+  const handleSaveChapter = async () => {
+    if (!selectedChapter || !currentProject) return;
+    setIsSavingChapter(true);
+    try {
+      await updateChapter(selectedChapter.id, {
+        title: editChapterTitle,
+        summary: editChapterSummary,
+        content: editChapterContent,
+        status: editChapterStatus,
+      });
+      toast.success('章节已保存');
+    } catch {
+      toast.error('保存章节失败');
+    } finally {
+      setIsSavingChapter(false);
+    }
+  };
+
+  const handleCreateChapter = async () => {
+    if (!currentProject) return;
+    if (!newChapterTitle.trim()) {
+      toast.error('请输入章节标题');
+      return;
+    }
+    try {
+      const chapter = await createChapter(currentProject.id, newChapterTitle);
+      setShowNewChapterModal(false);
+      setNewChapterTitle('');
+      handleSelectChapter(chapter);
+      toast.success('章节创建成功');
+    } catch {
+      toast.error('创建章节失败');
+    }
+  };
+
+  const handleDeleteChapter = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('确定要删除这个章节吗？')) return;
+    try {
+      await deleteChapter(id);
+      if (selectedChapter?.id === id) {
+        setSelectedChapter(null);
+        setChapterView('list');
+      }
+      toast.success('章节已删除');
+    } catch {
+      toast.error('删除章节失败');
+    }
+  };
+
+  const handleBackToChapterList = () => {
+    setChapterView('list');
+    // Reload chapters to get updated word counts
+    if (currentProject) {
+      loadChapters(currentProject.id);
+    }
+  };
+
+  const chapterStatusLabel: Record<ChapterStatus, string> = {
+    outline: '大纲',
+    draft: '草稿',
+    revising: '修改中',
+    done: '已完成',
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !currentSession || !currentProject) return;
 
@@ -419,7 +727,17 @@ function App() {
       {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <h1>📚 AI小说助手</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h1>📚 AI小说助手</h1>
+            <button
+              className="btn btn-sm btn-secondary"
+              onClick={handleOpenSettings}
+              title="AI 设置"
+              style={{ padding: '6px 8px', fontSize: '1rem' }}
+            >
+              ⚙️
+            </button>
+          </div>
         </div>
         <div className="sidebar-content">
           {/* Projects Section */}
@@ -492,6 +810,30 @@ function App() {
                 >
                   检查
                 </button>
+                <button
+                  className={`tab ${sidebarTab === 'chapters' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('chapters')}
+                >
+                  章节
+                </button>
+                <button
+                  className={`tab ${sidebarTab === 'pitch' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('pitch')}
+                >
+                  📋 企划案
+                </button>
+                <button
+                  className={`tab ${sidebarTab === 'styleProfile' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('styleProfile')}
+                >
+                  🎨 文风
+                </button>
+                <button
+                  className={`tab ${sidebarTab === 'promotion' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('promotion')}
+                >
+                  📣 传播
+                </button>
               </div>
 
               {/* Sessions Tab */}
@@ -541,6 +883,20 @@ function App() {
                         <div className="memory-title">{memory.title}</div>
                         <div className="memory-type">{memoryTypeLabels[memory.type].label}</div>
                       </div>
+                      {memory.type === 'character' && (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInterviewMemory(memory);
+                            setShowInterviewPanel(true);
+                          }}
+                          style={{ padding: '4px 8px', fontSize: '0.7rem', marginRight: 4 }}
+                          title="角色访谈"
+                        >
+                          🎭
+                        </button>
+                      )}
                       <button
                         className="btn btn-sm btn-secondary"
                         onClick={(e) => handleDeleteMemory(memory.id, e)}
@@ -704,6 +1060,50 @@ function App() {
                 </div>
               )}
 
+              {/* Chapters Tab */}
+              {sidebarTab === 'chapters' && (
+                <div className="sidebar-section">
+                  <button className="btn btn-sm btn-secondary btn-block" onClick={() => setShowNewChapterModal(true)}>
+                    + 新建章节
+                  </button>
+                  {chapters
+                    .sort((a, b) => a.order_index - b.order_index)
+                    .map((chapter) => (
+                    <div
+                      key={chapter.id}
+                      className={`card ${selectedChapter?.id === chapter.id ? 'active' : ''}`}
+                      onClick={() => handleSelectChapter(chapter)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div className="card-title">
+                            <span style={{ marginRight: 6 }}>
+                              {{ outline: '📋', draft: '✍️', revising: '🔧', done: '✅' }[chapter.status]}
+                            </span>
+                            {chapter.title}
+                          </div>
+                          <div className="card-meta">
+                            {chapterStatusLabel[chapter.status]} · {chapter.word_count} 字
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={(e) => handleDeleteChapter(chapter.id, e)}
+                          style={{ padding: '4px 8px' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {chapters.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 20, fontSize: '0.85rem' }}>
+                      暂无章节，点击上方按钮创建
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Consistency Tab */}
               {sidebarTab === 'consistency' && (
                 <div className="sidebar-section">
@@ -775,6 +1175,160 @@ function App() {
                 </div>
               )}
 
+              {/* Style Profile Tab */}
+              {sidebarTab === 'styleProfile' && (
+                <AuthorStylePanel projectId={currentProject.id} />
+              )}
+
+              {/* Promotion Tab */}
+              {sidebarTab === 'promotion' && currentProject && (
+                <PromotionPanel
+                  projectId={currentProject.id}
+                  projectName={currentProject.name}
+                />
+              )}
+
+              {/* Pitch Tab */}
+              {sidebarTab === 'pitch' && (
+                <div className="sidebar-section">
+                  <button
+                    className="btn btn-sm btn-primary btn-block"
+                    onClick={handleGeneratePitch}
+                    disabled={isGeneratingPitch}
+                    style={{ marginBottom: 8 }}
+                  >
+                    {isGeneratingPitch ? '⏳ 生成中...' : '🚀 生成企划案'}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary btn-block"
+                    onClick={() => {
+                      setExportTemplateName(currentProject?.name + ' 模板' || '');
+                      setExportTemplateDesc(currentProject?.description || '');
+                      setShowExportTemplateModal(true);
+                    }}
+                    style={{ marginBottom: 12 }}
+                  >
+                    📦 导出为模板
+                  </button>
+
+                  {isGeneratingPitch && (
+                    <div style={{ textAlign: 'center', padding: 20 }}>
+                      <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        AI 正在汇总项目设定，生成投稿材料...
+                      </div>
+                    </div>
+                  )}
+
+                  {!isGeneratingPitch && !pitchData && (
+                    <div className="pitch-empty">
+                      <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>📋</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: 4 }}>
+                        尚未生成企划案
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                        点击上方按钮，AI 将汇总你的项目记忆、故事圣经、章节和知识库，
+                        自动生成投稿用的企划材料。
+                      </div>
+                    </div>
+                  )}
+
+                  {!isGeneratingPitch && pitchData && (
+                    <div className="pitch-section">
+                      <button
+                        className="btn btn-sm btn-secondary btn-block"
+                        onClick={handleCopyPitchMarkdown}
+                        style={{ marginBottom: 12 }}
+                      >
+                        📋 一键复制 Markdown
+                      </button>
+
+                      {/* Logline */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">🎯 一句话梗概</div>
+                        <div className="pitch-field-content pitch-logline">
+                          {pitchData.logline || '（暂无）'}
+                        </div>
+                      </div>
+
+                      {/* Synopsis */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">📖 故事简介</div>
+                        <div className="pitch-field-content">
+                          {pitchData.synopsis || '（暂无）'}
+                        </div>
+                      </div>
+
+                      {/* Selling Points */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">✨ 卖点</div>
+                        <ul className="pitch-list">
+                          {pitchData.selling_points?.length
+                            ? pitchData.selling_points.map((s: string, i: number) => (
+                                <li key={i}>{s}</li>
+                              ))
+                            : <li>（暂无）</li>}
+                        </ul>
+                      </div>
+
+                      {/* Main Characters */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">👥 主要角色</div>
+                        {pitchData.main_characters?.length
+                          ? pitchData.main_characters.map(
+                              (c: { name: string; role: string; description: string }, i: number) => (
+                                <div key={i} className="pitch-character-card">
+                                  <div className="pitch-character-name">
+                                    {c.name}
+                                    <span className="pitch-character-role">{c.role}</span>
+                                  </div>
+                                  <div className="pitch-character-desc">{c.description}</div>
+                                </div>
+                              )
+                            )
+                          : <div className="pitch-field-content">（暂无）</div>}
+                      </div>
+
+                      {/* World Summary */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">🌍 世界观摘要</div>
+                        <div className="pitch-field-content">
+                          {pitchData.world_summary || '（暂无）'}
+                        </div>
+                      </div>
+
+                      {/* Target Audience */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">👀 目标读者</div>
+                        <div className="pitch-field-content">
+                          {pitchData.target_audience || '（暂无）'}
+                        </div>
+                      </div>
+
+                      {/* Cover Prompt */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">🎨 封面/海报提示词</div>
+                        <div className="pitch-cover-prompt">
+                          {pitchData.cover_prompt || '（暂无）'}
+                        </div>
+                      </div>
+
+                      {/* Social Posts */}
+                      <div className="pitch-field">
+                        <div className="pitch-field-title">📱 社媒宣传文案</div>
+                        <ul className="pitch-list">
+                          {pitchData.social_posts?.length
+                            ? pitchData.social_posts.map((s: string, i: number) => (
+                                <li key={i}>{s}</li>
+                              ))
+                            : <li>（暂无）</li>}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </>
           )}
         </div>
@@ -782,7 +1336,99 @@ function App() {
 
       {/* Main Content */}
       <div className="main-content">
-        {currentSession ? (
+        {selectedChapter && chapterView === 'editor' ? (
+          /* Chapter Editor */
+          <div className="chat-container">
+            <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button className="btn btn-sm btn-secondary" onClick={handleBackToChapterList}>
+                  ← 返回
+                </button>
+                <h2>📝 章节编辑</h2>
+              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleSaveChapter}
+                disabled={isSavingChapter}
+              >
+                {isSavingChapter ? '保存中...' : '💾 保存'}
+              </button>
+            </div>
+            <div className="chat-messages" style={{ padding: '24px', overflowY: 'auto' }}>
+              {/* Title */}
+              <div className="form-group">
+                <label className="form-label">章节标题</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editChapterTitle}
+                  onChange={(e) => setEditChapterTitle(e.target.value)}
+                  placeholder="输入章节标题..."
+                />
+              </div>
+
+              {/* Status & Word Count */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">状态</label>
+                  <select
+                    className="form-select"
+                    value={editChapterStatus}
+                    onChange={(e) => setEditChapterStatus(e.target.value as ChapterStatus)}
+                  >
+                    <option value="outline">📋 大纲</option>
+                    <option value="draft">✍️ 草稿</option>
+                    <option value="revising">🔧 修改中</option>
+                    <option value="done">✅ 已完成</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">字数统计</label>
+                  <div className="form-input" style={{ background: 'var(--bg-color)', display: 'flex', alignItems: 'center' }}>
+                    {editChapterContent.length} 字符
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="form-group">
+                <label className="form-label">章节摘要</label>
+                <textarea
+                  className="form-textarea"
+                  value={editChapterSummary}
+                  onChange={(e) => setEditChapterSummary(e.target.value)}
+                  placeholder="简要描述本章内容..."
+                  style={{ minHeight: 80 }}
+                />
+              </div>
+
+              {/* Content */}
+              <div className="form-group">
+                <label className="form-label">正文内容</label>
+                <textarea
+                  className="form-textarea"
+                  value={editChapterContent}
+                  onChange={(e) => setEditChapterContent(e.target.value)}
+                  placeholder="开始写作..."
+                  style={{ minHeight: 400, fontFamily: 'Georgia, "Noto Serif SC", serif', fontSize: '1rem', lineHeight: 1.8 }}
+                />
+              </div>
+
+              {/* Consistency check button */}
+              <div style={{ marginTop: 8, marginBottom: 24 }}>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => {
+                    setConsistencyText(editChapterContent);
+                    setSidebarTab('consistency');
+                  }}
+                >
+                  🔍 检查本章一致性
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : currentSession ? (
           <div className="chat-container">
             <div className="chat-header">
               <h2>{currentSession.name}</h2>
@@ -857,39 +1503,123 @@ function App() {
 
       {/* New Project Modal */}
       {showNewProjectModal && (
-        <div className="modal-overlay" onClick={() => setShowNewProjectModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => { setShowNewProjectModal(false); setCreateMode('blank'); setSelectedTemplate(null); }}>
+          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">新建项目</h3>
-              <button className="modal-close" onClick={() => setShowNewProjectModal(false)}>×</button>
+              <button className="modal-close" onClick={() => { setShowNewProjectModal(false); setCreateMode('blank'); setSelectedTemplate(null); }}>×</button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">项目名称</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="例如：玄幻小说构思"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                />
+              {/* Mode switcher */}
+              <div className="template-mode-tabs">
+                <button
+                  className={`template-mode-tab ${createMode === 'blank' ? 'active' : ''}`}
+                  onClick={() => { setCreateMode('blank'); setSelectedTemplate(null); }}
+                >
+                  ✏️ 空白项目
+                </button>
+                <button
+                  className={`template-mode-tab ${createMode === 'template' ? 'active' : ''}`}
+                  onClick={() => { setCreateMode('template'); setShowTemplateGallery(true); }}
+                >
+                  📦 从模板创建
+                </button>
               </div>
-              <div className="form-group">
-                <label className="form-label">项目描述（可选）</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="描述你的项目..."
-                  value={newProjectDesc}
-                  onChange={(e) => setNewProjectDesc(e.target.value)}
-                />
-              </div>
+
+              {createMode === 'blank' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">项目名称</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="例如：玄幻小说构思"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">项目描述（可选）</label>
+                    <textarea
+                      className="form-textarea"
+                      placeholder="描述你的项目..."
+                      value={newProjectDesc}
+                      onChange={(e) => setNewProjectDesc(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {createMode === 'template' && (
+                <>
+                  {selectedTemplate ? (
+                    <>
+                      <div className="template-selected-info">
+                        <span className="template-genre-badge">
+                          {selectedTemplate.genre === 'xuanhuan' && '⚔️ 玄幻升级流'}
+                          {selectedTemplate.genre === 'mystery' && '🔍 悬疑推理'}
+                          {selectedTemplate.genre === 'urban' && '🏙️ 都市异能'}
+                          {selectedTemplate.genre === 'romance' && '💕 恋爱群像'}
+                          {selectedTemplate.genre === 'scifi' && '🚀 科幻探索'}
+                        </span>
+                        <strong>已选模板：{selectedTemplate.name}</strong>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                          {selectedTemplate.description}
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                          包含 {(selectedTemplate.template_data?.memories?.length || 0)} 条记忆 · {' '}
+                          {(selectedTemplate.template_data?.story_bible_entries?.length || 0)} 条故事圣经条目
+                        </p>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          style={{ marginTop: 8 }}
+                          onClick={() => { setSelectedTemplate(null); setShowTemplateGallery(true); }}
+                        >
+                          重新选择模板
+                        </button>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">项目名称</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="可修改项目名称"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  ) : showTemplateGallery ? (
+                    <TemplateGallery
+                      onSelectTemplate={handleSelectTemplate}
+                    />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 30 }}>
+                      <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>📦</div>
+                      <div style={{ fontSize: '0.875rem', marginBottom: 12 }}>
+                        选择一个创作模板快速开始
+                      </div>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setShowTemplateGallery(true)}
+                      >
+                        浏览模板库
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowNewProjectModal(false)}>
+              <button className="btn btn-secondary" onClick={() => { setShowNewProjectModal(false); setCreateMode('blank'); setSelectedTemplate(null); }}>
                 取消
               </button>
-              <button className="btn btn-primary" onClick={handleCreateProject}>
-                创建
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateProject}
+                disabled={createMode === 'template' && !selectedTemplate}
+              >
+                {createMode === 'template' && selectedTemplate ? '从模板创建' : '创建'}
               </button>
             </div>
           </div>
@@ -1034,6 +1764,241 @@ function App() {
         </div>
       )}
 
+      {/* Export Template Modal */}
+      {showExportTemplateModal && (
+        <div className="modal-overlay" onClick={() => setShowExportTemplateModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">导出为模板</h3>
+              <button className="modal-close" onClick={() => setShowExportTemplateModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
+                将当前项目的所有记忆和故事圣经条目导出为一个可复用的模板。
+              </p>
+              <div className="form-group">
+                <label className="form-label">模板名称</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="例如：我的玄幻模板"
+                  value={exportTemplateName}
+                  onChange={(e) => setExportTemplateName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">模板描述（可选）</label>
+                <textarea
+                  className="form-textarea"
+                  placeholder="描述这个模板..."
+                  value={exportTemplateDesc}
+                  onChange={(e) => setExportTemplateDesc(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">模板类型</label>
+                <select
+                  className="form-input"
+                  value={exportTemplateGenre}
+                  onChange={(e) => setExportTemplateGenre(e.target.value as TemplateGenre)}
+                >
+                  <option value="xuanhuan">⚔️ 玄幻升级流</option>
+                  <option value="mystery">🔍 悬疑推理</option>
+                  <option value="urban">🏙️ 都市异能</option>
+                  <option value="romance">💕 恋爱群像</option>
+                  <option value="scifi">🚀 科幻探索</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowExportTemplateModal(false)}>
+                取消
+              </button>
+              <button className="btn btn-primary" onClick={handleExportTemplate} disabled={isExportingTemplate}>
+                {isExportingTemplate ? '导出中...' : '导出'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Chapter Modal */}
+      {showNewChapterModal && (
+        <div className="modal-overlay" onClick={() => setShowNewChapterModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">新建章节</h3>
+              <button className="modal-close" onClick={() => setShowNewChapterModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">章节标题</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="例如：第一章 相遇"
+                  value={newChapterTitle}
+                  onChange={(e) => setNewChapterTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateChapter()}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowNewChapterModal(false)}>
+                取消
+              </button>
+              <button className="btn btn-primary" onClick={handleCreateChapter}>
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">⚙️ AI 模型设置</h3>
+              <button className="modal-close" onClick={() => setShowSettingsModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {/* Current status */}
+              <div style={{
+                padding: '12px',
+                borderRadius: 8,
+                marginBottom: 16,
+                fontSize: '0.85rem',
+                background: settingsIsConfigured ? '#ecfdf5' : '#fef3c7',
+                border: `1px solid ${settingsIsConfigured ? '#10b981' : '#f59e0b'}`,
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  {settingsIsConfigured ? '✅ 已配置' : '⚠️ 未配置'}
+                </div>
+                <div>
+                  当前：{settingsCurrentProvider.toUpperCase()} · {settingsCurrentModel}
+                  {settingsIsLocal ? ' 🏠 内容仅在本地模型处理，不上传云端' : ' ☁️ 内容将发送至云端服务器'}
+                </div>
+              </div>
+
+              {/* Provider select */}
+              <div className="form-group">
+                <label className="form-label">AI 提供商</label>
+                <select
+                  className="form-select"
+                  value={settingsProvider}
+                  onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
+                >
+                  <option value="openai">OpenAI (GPT-4 / GPT-4o)</option>
+                  <option value="deepseek">DeepSeek (DeepSeek-Chat / Reasoner)</option>
+                  <option value="ollama">Ollama (本地部署)</option>
+                </select>
+              </div>
+
+              {/* Model select */}
+              <div className="form-group">
+                <label className="form-label">模型</label>
+                <select
+                  className="form-select"
+                  value={settingsModel}
+                  onChange={(e) => setSettingsModel(e.target.value)}
+                >
+                  {settingsModels
+                    .filter(m => m.provider === settingsProvider)
+                    .map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Base URL */}
+              <div className="form-group">
+                <label className="form-label">API 地址</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={settingsBaseUrl}
+                  onChange={(e) => setSettingsBaseUrl(e.target.value)}
+                  placeholder={
+                    settingsProvider === 'ollama'
+                      ? 'http://localhost:11434/v1'
+                      : settingsProvider === 'deepseek'
+                        ? 'https://api.deepseek.com/v1'
+                        : 'https://api.openai.com/v1'
+                  }
+                />
+              </div>
+
+              {/* API Key (hidden for Ollama) */}
+              {settingsProvider !== 'ollama' && (
+                <div className="form-group">
+                  <label className="form-label">API Key</label>
+                  <input
+                    type="password"
+                    className="form-input"
+                    value={settingsApiKey}
+                    onChange={(e) => setSettingsApiKey(e.target.value)}
+                    placeholder="sk-..."
+                  />
+                </div>
+              )}
+
+              {/* Privacy notice */}
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: 8,
+                marginBottom: 16,
+                fontSize: '0.8rem',
+                background: settingsProvider === 'ollama' ? '#ecfdf5' : '#eff6ff',
+                border: `1px solid ${settingsProvider === 'ollama' ? '#10b981' : '#3b82f6'}`,
+              }}>
+                {settingsProvider === 'ollama' ? (
+                  <>🏠 <strong>本地模式：</strong>内容仅在本地模型处理，不上传云端</>
+                ) : (
+                  <>☁️ <strong>云端模式：</strong>内容将发送至 {settingsProvider.toUpperCase()} 服务器</>
+                )}
+              </div>
+
+              {/* Test result */}
+              {settingsTestResult && (
+                <div style={{
+                  padding: '12px',
+                  borderRadius: 8,
+                  marginBottom: 16,
+                  fontSize: '0.85rem',
+                  background: settingsTestResult.success ? '#ecfdf5' : '#fef2f2',
+                  border: `1px solid ${settingsTestResult.success ? '#10b981' : '#ef4444'}`,
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    {settingsTestResult.success ? '✅ 连接成功' : '❌ 连接失败'}
+                  </div>
+                  <div style={{ wordBreak: 'break-word' }}>{settingsTestResult.message}</div>
+                </div>
+              )}
+
+              {/* Test button */}
+              <button
+                className="btn btn-secondary btn-block"
+                onClick={handleTestConnection}
+                disabled={settingsTesting}
+              >
+                {settingsTesting ? '测试中...' : '🔌 测试连接'}
+              </button>
+
+              <div style={{
+                marginTop: 12,
+                fontSize: '0.75rem',
+                color: 'var(--text-secondary)',
+                textAlign: 'center',
+              }}>
+                提示：修改 Provider 或 API Key 后需要重启后端服务才能生效
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* New Knowledge Base Modal */}
       {showNewKBModal && (
         <div className="modal-overlay" onClick={() => setShowNewKBModal(false)}>
@@ -1073,6 +2038,21 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Character Interview Panel */}
+      {showInterviewPanel && interviewMemory && currentProject && (
+        <CharacterInterview
+          memory={interviewMemory}
+          projectId={currentProject.id}
+          onClose={() => {
+            setShowInterviewPanel(false);
+            setInterviewMemory(null);
+          }}
+          onSaveMemory={(title, content) => {
+            createMemory(currentProject!.id, 'character', title, content);
+          }}
+        />
       )}
     </div>
   );

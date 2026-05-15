@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import type { Project, Session, Memory, KnowledgeBase, Message } from '../types';
-import { projectsApi, sessionsApi, memoriesApi, knowledgeBasesApi, messagesApi } from '../services/api';
+import type { Project, Session, Memory, KnowledgeBase, Message, Chapter, ChapterStatus } from '../types';
+import { projectsApi, sessionsApi, memoriesApi, knowledgeBasesApi, messagesApi, chaptersApi } from '../services/api';
 
 interface StoreContextType {
   // State
@@ -11,6 +11,7 @@ interface StoreContextType {
   memories: Memory[];
   knowledgeBases: KnowledgeBase[];
   messages: Message[];
+  chapters: Chapter[];
   isLoading: boolean;
   
   // Actions
@@ -35,6 +36,11 @@ interface StoreContextType {
   deleteKnowledgeBase: (id: string) => Promise<void>;
   
   loadMessages: (sessionId: string) => Promise<void>;
+
+  loadChapters: (projectId: string) => Promise<void>;
+  createChapter: (projectId: string, title: string, summary?: string, content?: string, status?: ChapterStatus) => Promise<Chapter>;
+  updateChapter: (id: string, data: { title?: string; summary?: string; content?: string; status?: ChapterStatus; order_index?: number }) => Promise<void>;
+  deleteChapter: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -47,6 +53,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [memories, setMemories] = useState<Memory[]>([]);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadProjects = useCallback(async () => {
@@ -94,10 +101,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       await loadSessions(project.id);
       await loadMemories(project.id);
       await loadKnowledgeBases(project.id);
+      await loadChapters(project.id);
     } else {
       setSessions([]);
       setMemories([]);
       setKnowledgeBases([]);
+      setChapters([]);
     }
   }, []);
 
@@ -172,6 +181,32 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setMessages(data);
   }, []);
 
+  const loadChapters = useCallback(async (projectId: string) => {
+    const data = await chaptersApi.getByProject(projectId);
+    setChapters(data.chapters);
+  }, []);
+
+  const createChapter = useCallback(async (projectId: string, title: string, summary?: string, content?: string, status?: ChapterStatus) => {
+    const chapter = await chaptersApi.create(projectId, {
+      title,
+      summary: summary || '',
+      content: content || '',
+      status: status || 'outline',
+    });
+    setChapters(prev => [...prev, chapter]);
+    return chapter;
+  }, []);
+
+  const updateChapter = useCallback(async (id: string, data: { title?: string; summary?: string; content?: string; status?: ChapterStatus; order_index?: number }) => {
+    const updated = await chaptersApi.update(id, data);
+    setChapters(prev => prev.map(c => c.id === id ? updated : c));
+  }, []);
+
+  const deleteChapter = useCallback(async (id: string) => {
+    await chaptersApi.delete(id);
+    setChapters(prev => prev.filter(c => c.id !== id));
+  }, []);
+
   return (
     <StoreContext.Provider
       value={{
@@ -182,6 +217,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         memories,
         knowledgeBases,
         messages,
+        chapters,
         isLoading,
         loadProjects,
         createProject,
@@ -200,6 +236,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         createKnowledgeBase,
         deleteKnowledgeBase,
         loadMessages,
+        loadChapters,
+        createChapter,
+        updateChapter,
+        deleteChapter,
       }}
     >
       {children}

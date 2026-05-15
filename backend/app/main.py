@@ -9,7 +9,14 @@ from app.api import (
     messages_router,
     chat_router,
     story_bible_router,
-    consistency_router
+    consistency_router,
+    settings_router,
+    chapters_router,
+    character_chat_router,
+    pitch_router,
+    templates_router,
+    style_router,
+    promotion_router,
 )
 
 # Create database tables
@@ -40,6 +47,31 @@ app.include_router(messages_router)
 app.include_router(chat_router)
 app.include_router(story_bible_router)
 app.include_router(consistency_router)
+app.include_router(settings_router)
+app.include_router(chapters_router)
+app.include_router(character_chat_router)
+app.include_router(pitch_router)
+app.include_router(templates_router)
+app.include_router(style_router)
+app.include_router(promotion_router)
+
+
+def seed_templates():
+    """Seed built-in templates on startup if none exist."""
+    from app.core.database import SessionLocal
+    from app.services.template_service import template_service
+
+    db = SessionLocal()
+    try:
+        count = template_service.seed_builtin_templates(db)
+        if count > 0:
+            print(f"[startup] Seeded {count} built-in templates")
+    finally:
+        db.close()
+
+
+seed_templates()
+
 
 @app.get("/")
 def root():

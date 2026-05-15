@@ -46,6 +46,7 @@ class Project(Base):
     memories = relationship("Memory", back_populates="project", cascade="all, delete-orphan")
     knowledge_bases = relationship("KnowledgeBase", back_populates="project", cascade="all, delete-orphan")
     story_bible_entries = relationship("StoryBibleEntry", back_populates="project", cascade="all, delete-orphan")
+    style_profiles = relationship("AuthorStyleProfile", back_populates="project", cascade="all, delete-orphan")
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -129,3 +130,64 @@ class Document(Base):
     
     # Relationships
     knowledge_base = relationship("KnowledgeBase", back_populates="documents")
+
+
+class ChapterStatus(str, enum.Enum):
+    OUTLINE = "outline"
+    DRAFT = "draft"
+    REVISING = "revising"
+    DONE = "done"
+
+
+class Chapter(Base):
+    __tablename__ = "chapters"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    summary = Column(Text, default="")
+    content = Column(Text, default="")
+    status = Column(SQLEnum(ChapterStatus), default=ChapterStatus.OUTLINE)
+    order_index = Column(Float, default=0)
+    word_count = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+
+
+class TemplateGenre(str, enum.Enum):
+    XUANHUAN = "xuanhuan"
+    MYSTERY = "mystery"
+    URBAN = "urban"
+    ROMANCE = "romance"
+    SCIFI = "scifi"
+
+
+class ProjectTemplate(Base):
+    __tablename__ = "project_templates"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    genre = Column(SQLEnum(TemplateGenre), nullable=False)
+    template_data = Column(JSON, default={})
+    is_public = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AuthorStyleProfile(Base):
+    __tablename__ = "author_style_profiles"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    sample_text = Column(Text, nullable=False)
+    style_summary = Column(Text, default="")
+    rules_json = Column(JSON, default={})
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project", back_populates="style_profiles")

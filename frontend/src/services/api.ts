@@ -25,6 +25,27 @@ import type {
   StoryBibleGenerateResponse,
   ConsistencyCheckRequest,
   ConsistencyCheckResponse,
+  SettingsModelsResponse,
+  TestConnectionRequest,
+  TestConnectionResponse,
+  ProviderStatus,
+  Chapter,
+  ChapterListResponse,
+  CreateChapterRequest,
+  UpdateChapterRequest,
+  CharacterInterviewRequest,
+  CharacterInterviewResponse,
+  PitchGenerateResponse,
+  ProjectTemplate,
+  TemplateData,
+  CreateProjectFromTemplateRequest,
+  ExportTemplateRequest,
+  AuthorStyleProfile,
+  CreateStyleProfileRequest,
+  StyleRewriteRequest,
+  StyleRewriteResponse,
+  PromotionGenerateRequest,
+  PromotionGenerateResponse,
 } from '../types';
 
 const api = axios.create({
@@ -108,6 +129,75 @@ export const storyBibleApi = {
 // Consistency API
 export const consistencyApi = {
   check: (projectId: string, data: ConsistencyCheckRequest) => api.post<ConsistencyCheckResponse>(`/projects/${projectId}/consistency-check`, data).then(res => res.data),
+};
+
+// Settings API
+export const settingsApi = {
+  getModels: () => api.get<SettingsModelsResponse>('/settings/models').then(res => res.data),
+  testConnection: (data: TestConnectionRequest) => api.post<TestConnectionResponse>('/settings/models/test', data).then(res => res.data),
+  getProviderStatus: () => api.get<ProviderStatus>('/settings/provider-status').then(res => res.data),
+};
+
+// Chapters API
+export const chaptersApi = {
+  getByProject: (projectId: string) => api.get<ChapterListResponse>(`/projects/${projectId}/chapters`).then(res => res.data),
+  getById: (id: string) => api.get<Chapter>(`/chapters/${id}`).then(res => res.data),
+  create: (projectId: string, data: CreateChapterRequest) => api.post<Chapter>(`/projects/${projectId}/chapters`, data).then(res => res.data),
+  update: (id: string, data: UpdateChapterRequest) => api.put<Chapter>(`/chapters/${id}`, data).then(res => res.data),
+  delete: (id: string) => api.delete(`/chapters/${id}`).then(res => res.data),
+};
+
+// Character Interview API
+export const characterApi = {
+  interview: (projectId: string, memoryId: string, data: CharacterInterviewRequest) =>
+    api.post<CharacterInterviewResponse>(`/projects/${projectId}/characters/${memoryId}/interview`, data).then(res => res.data),
+};
+
+// Pitch API
+export const pitchApi = {
+  generate: (projectId: string) =>
+    api.post<PitchGenerateResponse>(`/projects/${projectId}/pitch/generate`).then(res => res.data),
+};
+
+// Templates API
+export const templatesApi = {
+  getAll: (genre?: string) => {
+    const params = genre ? { genre } : {};
+    return api.get<ProjectTemplate[]>('/templates', { params }).then(res => res.data);
+  },
+  getById: (id: string) => api.get<ProjectTemplate>(`/templates/${id}`).then(res => res.data),
+  create: (data: {
+    name: string;
+    description?: string;
+    genre: string;
+    template_data: TemplateData;
+    is_public?: boolean;
+  }) => api.post<ProjectTemplate>('/templates', data).then(res => res.data),
+  createProject: (templateId: string, data?: CreateProjectFromTemplateRequest) =>
+    api.post<Project>(`/templates/${templateId}/create-project`, data || {}).then(res => res.data),
+  exportProject: (projectId: string, data: ExportTemplateRequest) =>
+    api.post<ProjectTemplate>(`/projects/${projectId}/export-template`, data).then(res => res.data),
+  delete: (id: string) => api.delete(`/templates/${id}`).then(res => res.data),
+};
+
+// Author Style DNA API
+export const styleApi = {
+  getByProject: (projectId: string) =>
+    api.get<AuthorStyleProfile[]>(`/projects/${projectId}/style-profiles`).then(res => res.data),
+  create: (projectId: string, data: CreateStyleProfileRequest) =>
+    api.post<AuthorStyleProfile>(`/projects/${projectId}/style-profiles`, data).then(res => res.data),
+  getById: (id: string) =>
+    api.get<AuthorStyleProfile>(`/style-profiles/${id}`).then(res => res.data),
+  delete: (id: string) =>
+    api.delete(`/style-profiles/${id}`),
+  rewrite: (styleId: string, data: StyleRewriteRequest) =>
+    api.post<StyleRewriteResponse>(`/style-profiles/${styleId}/rewrite`, data).then(res => res.data),
+};
+
+// Promotion API
+export const promotionApi = {
+  generate: (projectId: string, data: PromotionGenerateRequest) =>
+    api.post<PromotionGenerateResponse>(`/projects/${projectId}/promotion/generate`, data).then(res => res.data),
 };
 
 export default api;
