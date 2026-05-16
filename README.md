@@ -1,5 +1,8 @@
 # 📖 AI-Story (AI 小说构思助手)
 
+> 📐 项目架构：请先阅读 [ARCHITECTURE.md](./ARCHITECTURE.md)，这是项目宪法。  
+> 📖 Skill 编写规范：[SKILL_AUTHORING_GUIDE.md](./SKILL_AUTHORING_GUIDE.md)
+
 > **面向小说创作者的 AI 创作资产管理 + 连续性检查 + IP 孵化工作台**
 
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
@@ -72,7 +75,7 @@ cd AI-Story
 
 ### 2. 启动后端服务 (Backend)
 ```bash
-cd backend
+cd app/backend
 
 # 创建并激活虚拟环境
 python -m venv venv
@@ -93,7 +96,7 @@ uvicorn app.main:app --reload --port 8000
 ### 3. 启动前端服务 (Frontend)
 打开一个新的终端窗口：
 ```bash
-cd frontend
+cd app/frontend
 npm install
 npm run dev
 ```
